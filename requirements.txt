@@ -1,0 +1,9 @@
+# CAD 빌드 의존성 (python build.py). CI는 Python 3.12 + 이 파일.
+# cadquery 버전이 바뀌면 형상이 미세하게 달라질 수 있어 고정한다.
+cadquery==2.8.0
+ezdxf>=1.1
+matplotlib>=3.8
+openpyxl>=3.1
+pyvista>=0.43
+vtk>=9.3
+pyyaml>=6

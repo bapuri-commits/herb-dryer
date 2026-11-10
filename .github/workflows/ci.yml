@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cad-build:
+    name: cad-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # git describe (버전 문자열), PR 비교용
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: 시스템 패키지 (한글 폰트, 오프스크린 렌더)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends fonts-noto-cjk xvfb libgl1 libglu1-mesa libxrender1 libxext6
+
+      - name: 파이썬 패키지
+        run: pip install -r requirements.txt
+
+      - name: 빌드 (STEP → 간섭 검사 → 도면 → STL → 렌더 → CSV)
+        run: xvfb-run -a python build.py all
+
+      - name: 요약
+        if: always()
+        run: |
+          {
+            echo "## herb-dryer 빌드 $(cat build/VERSION.txt 2>/dev/null)"
+            echo '### 간섭 검사'
+            echo '```'
+            cat build/interference.txt 2>/dev/null || echo "(간섭 검사 결과 없음)"
+            echo '```'
+            echo "- 렌더 이미지: $(ls build/render/*.png 2>/dev/null | wc -l)장"
+            echo "- STL: $(ls build/stl/*.stl 2>/dev/null | wc -l)개"
+            echo "- DXF: $(ls build/drawings/dxf/*.dxf 2>/dev/null | wc -l)개"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ---- PR 전용: 기준 브랜치와 형상 비교 (참고용, 실패해도 CI는 통과) ----
+      - name: "PR: 기준 브랜치와 STEP 비교"
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          git worktree add -q /tmp/base "origin/${{ github.base_ref }}"
+          mkdir -p /tmp/base_build && cd /tmp/base_build
+          CAD=/tmp/base/cad/herb_dryer_cad.py
+          if [ ! -f "$CAD" ]; then echo "기준 브랜치에 CAD 없음 — 비교 생략" | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          python "$CAD" /tmp/base_build > /dev/null
+          BASE_STEP=$(ls /tmp/base_build/*.step | head -1)
+          echo "### 형상 비교: ${{ github.base_ref }} → 이 PR" >> "$GITHUB_STEP_SUMMARY"
+          python "$GITHUB_WORKSPACE/cad/tools/compare_step.py" "$BASE_STEP" "$GITHUB_WORKSPACE/build/herb_dryer.step" --md /tmp/compare.md || true
+          cat /tmp/compare.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: "PR: BOM 시트별 CSV diff"
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          if git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- bom/; then
+            echo "BOM 변경 없음"; exit 0
+          fi
+          git show "origin/${{ github.base_ref }}:bom/herb_dryer_BOM.xlsx" > /tmp/base_bom.xlsx
+          python scripts/bom_to_csv.py /tmp/base_bom.xlsx /tmp/bom_base > /dev/null
+          diff -ru /tmp/bom_base build/bom_csv > /tmp/bom.diff || true
+          {
+            echo "### BOM 변경 (시트별 CSV diff, 앞 열 = 엑셀 행 번호)"
+            echo '```diff'
+            head -c 60000 /tmp/bom.diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cp /tmp/bom.diff build/bom_csv/bom.diff
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: herb-dryer-build-${{ github.sha }}
+          path: build/
+          retention-days: 30
+          if-no-files-found: warn
+
+  firmware-build:
+    name: firmware-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+      - name: PlatformIO 설치
+        run: pip install platformio
+      - name: pio run
+        run: pio run -d firmware

@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.ref_name }}
+      HERB_VERSION: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: CHANGELOG에서 이 버전의 릴리스 노트 꺼내기
+        run: python3 scripts/changelog_section.py "$TAG" > /tmp/notes.md
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: 시스템 패키지
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends fonts-noto-cjk xvfb libgl1 libglu1-mesa libxrender1 libxext6 zip
+
+      - name: 파이썬 패키지
+        run: pip install -r requirements.txt
+
+      - name: 빌드 (간섭 있으면 여기서 실패 → Release 안 만듦)
+        run: xvfb-run -a python build.py all
+
+      - name: 첨부 파일 묶기 (파일 이름에 태그)
+        run: |
+          mkdir dist
+          P="herb_dryer_${TAG}"
+          cp build/herb_dryer.step                        "dist/${P}.step"
+          cp build/drawings/herb_dryer_holes.pdf          "dist/${P}_holes.pdf"
+          cp build/drawings/herb_dryer_print_1to1.pdf     "dist/${P}_print_1to1.pdf"
+          (cd build/drawings/dxf && zip -q -r "../../../dist/${P}_dxf.zip" .)
+          (cd build/stl && zip -q -r "../../dist/${P}_stl.zip" .)
+          for f in build/render/*.png; do [ -f "$f" ] && cp "$f" "dist/${P}_$(basename "$f")"; done
+          cp bom/herb_dryer_BOM.xlsx                      "dist/herb_dryer_BOM_${TAG}.xlsx"
+          cp build/fasteners.csv                          "dist/${P}_fasteners.csv"
+          cp build/print_parts.csv                        "dist/${P}_print_parts.csv"
+          ls -la dist
+
+      - name: GitHub Release 만들기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file /tmp/notes.md
+          else
+            gh release create "$TAG" dist/* --title "herb-dryer $TAG" --notes-file /tmp/notes.md --verify-tag
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: herb-dryer-${{ github.ref_name }}
+          path: dist/
