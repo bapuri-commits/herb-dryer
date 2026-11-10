@@ -1,4 +1,7 @@
-"""판재 가공 도면: 구멍표 PDF + 1:1 분할 인쇄 PDF + DXF"""
+"""판재 가공 도면: 구멍표 PDF + 1:1 분할 인쇄 PDF + DXF
+
+python cad/tools/drawings.py <cad.py> <출력폴더>
+"""
 import sys, math, json, importlib.util, os
 import cadquery as cq
 import matplotlib; matplotlib.use("Agg")
@@ -6,11 +9,31 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import font_manager as fm
 import ezdxf
-fp="/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
-fm.fontManager.addfont(fp); plt.rcParams["font.family"]=fm.FontProperties(fname=fp).get_name()
+# 한글 폰트: 환경변수 HERB_FONT → 알려진 경로 → 시스템 폰트 검색 → 없으면 기본 폰트(한글 깨짐 경고)
+FONT_CANDIDATES=[
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",      # Debian/Ubuntu fonts-noto-cjk
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",           # Arch/Fedora
+    "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+    "/System/Library/Fonts/AppleSDGothicNeo.ttc",                  # macOS
+    "C:/Windows/Fonts/malgun.ttf",                                 # Windows 맑은 고딕
+]
+FONT_NAME_HINTS=("NotoSansCJK","Noto Sans CJK","NotoSansKR","Noto Sans KR","NanumGothic","malgun","AppleSDGothic","AppleGothic")
+def pick_font():
+    env=os.environ.get("HERB_FONT")
+    if env and os.path.exists(env): return env
+    for fp in FONT_CANDIDATES:
+        if os.path.exists(fp): return fp
+    for fp in fm.findSystemFonts():
+        if any(h.lower() in os.path.basename(fp).lower().replace(" ","") or h.lower() in fp.lower() for h in FONT_NAME_HINTS):
+            return fp
+    return None
+fp=pick_font()
+if fp:
+    fm.fontManager.addfont(fp); plt.rcParams["font.family"]=fm.FontProperties(fname=fp).get_name()
+else:
+    print("경고: 한글 폰트를 못 찾음 → 기본 폰트 사용 (한글이 네모로 나올 수 있음). HERB_FONT=<폰트 경로>로 지정 가능", file=sys.stderr)
 plt.rcParams["axes.unicode_minus"]=False
-spec=importlib.util.spec_from_file_location("m",sys.argv[1]); m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-OUTDIR=sys.argv[2]; os.makedirs(OUTDIR+"/dxf",exist_ok=True)
+m=None; OUTDIR=None
 
 FLAT_PREFIX=("P01","P02","P03","P04","P06","P07","D01","D02","D03","F0","A0","A10","A11","T02","I03","S05","I05")
 TITLE={"P01_side_L":"옆판 왼쪽","P01_side_R":"옆판 오른쪽","P02_front":"앞판","P03_back":"뒷판","P04_duct":"덕트·칸막이 벽",
@@ -234,22 +257,36 @@ def write_dxf(d,fn):
         else: poly(g[1],"POCKETS")
     doc.saveas(fn)
 
-flats=[p for p in m.PARTS if p["phase"]==1 and p["name"].startswith(FLAT_PREFIX)]
-order=sorted(flats,key=lambda p:p["name"])
-data=[]
-for p in order:
-    try: data.append(analyze(p))
-    except Exception as e: print("FAIL",p["name"],e)
-summary=[]
-with PdfPages(f"{OUTDIR}/herb_dryer_v2_9_가공도면_구멍표.pdf") as pdf:
-    for d in data:
-        rows=overview_page(pdf,d); write_dxf(d,f"{OUTDIR}/dxf/{d['name']}.dxf")
-        summary.append(dict(name=d["name"],title=d["title"],mat=d["mat"],th=d["th"],W=d["W"],H=d["H"],n_holes=len(d["through"]),n_pockets=len(d["pockets"]),face=d["face"],rect=is_rect(d)))
+HOLES_PDF="herb_dryer_holes.pdf"          # 구멍표 (판마다 1쪽)
+PRINT_PDF="herb_dryer_print_1to1.pdf"     # 1:1 분할 인쇄 (포맥스판)
 TILE=("P01","P02","P03","P04","P06","P07","D01")
-with PdfPages(f"{OUTDIR}/herb_dryer_v2_9_1대1_인쇄_포맥스판.pdf") as pdf:
-    tot=0
-    for d in data:
-        if d["name"].startswith(TILE): tot+=tiled_pages(pdf,d)
-print("pages 1:1:",tot)
-json.dump(summary,open(f"{OUTDIR}/cut_summary.json","w"),ensure_ascii=False,indent=1)
-for s in summary: print(s["name"],s["W"],s["H"],s["th"],s["n_holes"],s["n_pockets"],s["rect"])
+
+def run(cad_module, outdir, version=""):
+    """cad_module: 실행된 CAD 모듈 (PARTS 보유). 실패한 판 이름 목록을 돌려준다."""
+    global m, OUTDIR
+    m=cad_module; OUTDIR=str(outdir); os.makedirs(OUTDIR+"/dxf",exist_ok=True)
+    flats=[p for p in m.PARTS if p["phase"]==1 and p["name"].startswith(FLAT_PREFIX)]
+    order=sorted(flats,key=lambda p:p["name"])
+    data=[]; failed=[]
+    for p in order:
+        try: data.append(analyze(p))
+        except Exception as e: print("FAIL",p["name"],e); failed.append(p["name"])
+    if version:
+        for d in data: d["title"]=f"{d['title']} [{version}]"
+    summary=[]
+    with PdfPages(f"{OUTDIR}/{HOLES_PDF}") as pdf:
+        for d in data:
+            rows=overview_page(pdf,d); write_dxf(d,f"{OUTDIR}/dxf/{d['name']}.dxf")
+            summary.append(dict(name=d["name"],title=d["title"],mat=d["mat"],th=d["th"],W=d["W"],H=d["H"],n_holes=len(d["through"]),n_pockets=len(d["pockets"]),face=d["face"],rect=is_rect(d)))
+    with PdfPages(f"{OUTDIR}/{PRINT_PDF}") as pdf:
+        tot=0
+        for d in data:
+            if d["name"].startswith(TILE): tot+=tiled_pages(pdf,d)
+    print("pages 1:1:",tot)
+    json.dump(summary,open(f"{OUTDIR}/cut_summary.json","w",encoding="utf-8"),ensure_ascii=False,indent=1)
+    for s in summary: print(s["name"],s["W"],s["H"],s["th"],s["n_holes"],s["n_pockets"],s["rect"])
+    return failed
+
+if __name__=="__main__":
+    spec=importlib.util.spec_from_file_location("herb_cad",sys.argv[1]); mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    sys.exit(1 if run(mod,sys.argv[2]) else 0)
