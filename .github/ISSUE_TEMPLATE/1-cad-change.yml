@@ -1,0 +1,52 @@
+name: CAD 변경 요청
+description: 형상·구조를 바꿔 달라고 통합 담당에게 요청 (실측 값 반영은 '실측 결과' 양식)
+title: "[CAD] "
+labels: ["cad"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CAD는 통합 담당 한 명만 고칩니다. 여기에 요청을 남기면 통합 담당이 PR을 만듭니다.
+        바디 이름은 [docs/naming.md](../blob/main/docs/naming.md) 또는 Fusion에서 STEP 트리를 보세요.
+  - type: textarea
+    id: what
+    attributes:
+      label: 무엇을 바꾸나
+      description: 지금 어떻게 되어 있고, 어떻게 바꾸면 좋은지. 치수는 mm
+      placeholder: "예: 흡기 박스 활성탄 슬롯 폭 6 → 8"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 왜
+      description: 문제 상황, 근거 (사진·렌더 캡처 첨부 가능)
+    validations:
+      required: true
+  - type: textarea
+    id: bodies
+    attributes:
+      label: 영향받는 부품 (CAD 바디 이름)
+      description: 한 줄에 하나. 이미 만든 부품이면 그 버전도
+      placeholder: |
+        I01_intake_box_PETG (v2.9.0으로 출력함)
+        I03_carbon_pad
+    validations:
+      required: true
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: 급한 정도
+      options:
+        - "막힘 — 이거 없으면 조립·시험 못 함"
+        - "이번 주 안"
+        - "다음 마이너 버전 때"
+        - "아이디어 (언젠가)"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 분야
+      multiple: true
+      options: ["외함", "3d프린트", "전장", "펌웨어", "구매"]

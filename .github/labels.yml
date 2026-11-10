@@ -1,0 +1,12 @@
+# 라벨 정의. main에 푸시되면 .github/workflows/labels.yml 이 레포에 만든다/고친다.
+# 분야
+- {name: cad,      color: "1d76db", description: "CAD 스크립트·params.yaml"}
+- {name: 외함,     color: "c5def5", description: "포맥스·폼·라이너 재단, 조립"}
+- {name: 3d프린트, color: "5319e7", description: "PETG 출력 부품"}
+- {name: 전장,     color: "fbca04", description: "배선, 전원, 모듈, 센서 장착"}
+- {name: 펌웨어,   color: "0e8a16", description: "firmware/ ESP32"}
+- {name: 구매,     color: "f9d0c4", description: "BOM, 주문, 도착"}
+# 상태
+- {name: 실측필요, color: "e99695", description: "부품 도착 후 재서 params.yaml에 반영해야 함"}
+- {name: 안전,     color: "b60205", description: "히터·전원·과열 보호 관련 (리뷰 필수)"}
+- {name: 2차,      color: "bfdadc", description: "2차(펠티어) 단계. 1차에서는 미룸"}

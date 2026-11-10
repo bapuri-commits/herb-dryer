@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 최신 파일 받기 (Release)
+    url: https://github.com/bapuri-commits/herb-dryer/releases/latest
+    about: STEP, 도면 PDF, DXF, STL, 렌더, BOM은 여기서

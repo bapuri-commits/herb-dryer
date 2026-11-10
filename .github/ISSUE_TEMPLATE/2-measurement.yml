@@ -1,0 +1,50 @@
+name: 실측 결과
+description: 도착한 부품을 재서 params.yaml 값 바꾸기 요청 (패치 버전)
+title: "[실측] "
+labels: ["cad", "실측필요"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        재는 법·사진 규칙: [docs/measurements/README.md](../blob/main/docs/measurements/README.md)
+        통합 담당이 `cad/params.yaml`의 value·status·source만 바꾸는 PR을 만들고, 반영되면 `실측필요` 라벨을 뗍니다.
+  - type: input
+    id: part
+    attributes:
+      label: 부품 이름
+      placeholder: "예: PTC 발열체 12V 80W"
+    validations:
+      required: true
+  - type: input
+    id: bom_no
+    attributes:
+      label: BOM No
+      description: BOM xlsx "1차 BOM" 시트의 No
+      placeholder: "8"
+    validations:
+      required: true
+  - type: textarea
+    id: values
+    attributes:
+      label: 잰 값과 params.yaml 키
+      description: params.yaml 키마다 한 줄. 3번 잰 평균, mm
+      value: |
+        | params.yaml 키 | 지금 값 | 잰 값 | 비고 |
+        |---|---|---|---|
+        | PTC.w | 70 | | |
+    validations:
+      required: true
+  - type: textarea
+    id: photos
+    attributes:
+      label: 사진
+      description: 캘리퍼스 눈금이 보이게. 여기에 끌어다 놓으면 첨부됨
+    validations:
+      required: true
+  - type: input
+    id: who
+    attributes:
+      label: 측정자·날짜·도구
+      placeholder: "홍길동 2026-11-14, 디지털 캘리퍼스"
+    validations:
+      required: true

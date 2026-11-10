@@ -1,0 +1,51 @@
+name: 부품 구매·확정
+description: BOM 부품의 구매처·가격·상태 확정 또는 변경
+title: "[구매] "
+labels: ["구매"]
+body:
+  - type: input
+    id: bom_no
+    attributes:
+      label: BOM No
+      description: BOM xlsx "1차 BOM" (2차는 "2차 BOM") 시트의 No. 새 부품이면 "새로"
+      placeholder: "21"
+    validations:
+      required: true
+  - type: input
+    id: part
+    attributes:
+      label: 부품 / 규격
+      placeholder: "ESP32 38핀 확장보드 (DevKitC용)"
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: 상품 링크
+      placeholder: "https://..."
+    validations:
+      required: true
+  - type: input
+    id: price
+    attributes:
+      label: 가격 (원, 개당 × 수량, 배송비)
+      placeholder: "4,500 × 1, 배송 3,000"
+    validations:
+      required: true
+  - type: dropdown
+    id: status
+    attributes:
+      label: 상태
+      options:
+        - 후보 (검토 중)
+        - 확정 (이걸로 산다)
+        - 주문함
+        - 도착 (→ 실측 필요하면 '실측 결과' 이슈)
+        - 취소·대체
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 비고
+      description: CAD에 영향 있는 치수(판매처 표기), 주의점, 대체품

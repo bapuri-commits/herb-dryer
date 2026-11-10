@@ -1,0 +1,7 @@
+# cad/ 와 bom/ 은 통합 담당의 리뷰가 있어야 병합된다.
+# TODO: 통합 담당이 정해지면 아래 @bapuri-commits 를 그 사람의 GitHub 아이디로 바꾸세요.
+#       (CODEOWNERS 리뷰 강제는 main 브랜치 보호의 "Require review from Code Owners"를 켜야 동작)
+
+/cad/          @bapuri-commits
+/bom/          @bapuri-commits
+/.github/      @bapuri-commits
