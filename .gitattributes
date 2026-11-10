@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+# 바이너리: 줄 단위 diff·병합 불가 → PR 설명에 "어느 시트 몇 행" 적기
+*.xlsx binary
+*.xls  binary
+*.step binary
+*.stp  binary
+*.stl  binary
+*.dxf  binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.heic binary
+*.zip  binary

@@ -1,0 +1,14 @@
+# 생성물: CI 산출물·Release로만 배포
+build/
+*.step.bak
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+~$*.xlsx
+
+# PlatformIO
+firmware/.pio/
+firmware/.vscode/
