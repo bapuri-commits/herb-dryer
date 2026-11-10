@@ -11,10 +11,44 @@ v2.8 → v2.9 주요 변경
 - 전장부 높이 60 → 65 (60mm 팬 세워 설치). 앞문 개구부 276 → 260 (경첩·자석 자리).
 - 판재를 재단표 단위로 분리, 모든 장착 구멍·체결부품(볼트·너트·스탠드오프) 모델링.
 
-실측 후 수정할 값은 '# [실측]' 표시. 사지 않았거나 판매처마다 다른 부품.
+실측 후 수정할 값은 cad/params.yaml 에 있다 (value / status / source).
+사지 않았거나 판매처마다 다른 부품. 이 스크립트는 시작할 때 params.yaml 을 읽는다.
+버전은 파일 이름이 아니라 git 태그로 관리한다 (docs/workflow.md).
+
+실행: python cad/herb_dryer_cad.py [출력폴더=build]
 """
 import math
+import os
+from pathlib import Path
 import cadquery as cq
+import yaml
+
+# ============================================================
+# 0-a. [실측] 파라미터 읽기 (cad/params.yaml)
+# ============================================================
+PARAMS_PATH = Path(os.environ.get("HERB_PARAMS", Path(__file__).resolve().with_name("params.yaml")))
+STATUSES = ("가정", "판매처 표기", "실측")
+
+def load_params(path=PARAMS_PATH):
+    """params.yaml → {그룹: {키: 값}}. status/source 검사도 한다."""
+    raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    out, meta = {}, {}
+    for grp, items in raw.items():
+        out[grp], meta[grp] = {}, {}
+        for k, v in items.items():
+            if not isinstance(v, dict) or "value" not in v:
+                continue                      # bom 등 설명용 키
+            st, src = v.get("status"), v.get("source")
+            if st not in STATUSES:
+                raise ValueError(f"params.yaml {grp}.{k}: status '{st}' 는 {STATUSES} 중 하나여야 함")
+            if st == "실측" and not src:
+                raise ValueError(f"params.yaml {grp}.{k}: status 가 실측이면 source(측정자·날짜)가 필요함")
+            val = v["value"]
+            out[grp][k] = tuple(val) if isinstance(val, list) else val
+            meta[grp][k] = dict(status=st, source=src)
+    return out, meta
+
+PARAMS, PARAMS_META = load_params()
 
 # ============================================================
 # 0. 파라미터
@@ -49,22 +83,20 @@ GAP = 2                         # 문 가스켓 눌린 두께
 
 SO_Z = WALL                     # 스탠드오프 시작 높이(바닥판 윗면) 5
 
-# 구매 부품 치수
-FAN60 = dict(s=60, t=25, hole=50, hd=4.3)      # 60mm 순환팬
-FAN40 = dict(s=40, t=10, hole=32, hd=3.4)      # 40mm 흡기팬
-PTC = dict(w=70, d=26, h=35)                   # [실측] PTC 80W 핀 (x폭, y공기방향 두께, z높이)
-EXP = dict(w=78, d=63, t=1.6, inset=3.5)       # [실측] ESP32 38핀 확장보드 (판매처마다 68~78×53~63)
+# 구매 부품 치수 — [실측] 값은 params.yaml 에서
+FAN60 = PARAMS["FAN60"]                        # 60mm 순환팬 (s, t, hole, hd)
+FAN40 = PARAMS["FAN40"]                        # 40mm 흡기팬
+PTC = PARAMS["PTC"]                            # [실측] PTC 80W 핀 (x폭, y공기방향 두께, z높이)
+EXP = PARAMS["EXP"]                            # [실측] ESP32 38핀 확장보드 (판매처마다 68~78×53~63)
 DEVKIT = dict(w=27.9, d=54.4, t=1.6)           # ESP32 DevKitC V4 (공식 54.4×27.9)
-LCD = dict(w=80, h=36, hx=75, hz=31, bez_w=71, bez_h=24, bez_t=7)   # LCD1602 + I2C 백팩
-LC = dict(L=80, s=12.7, hole_sp=15, hole_end=7.5, thread=4)          # [실측] 1kg 바형 로드셀 (M4/M5 확인)
-MOD = {   # 캐리어 판 위 소형 모듈 (가로×세로×높이)
-    "SD":     (42, 24, 8),
-    "HX711":  (34, 20, 6),
-    "D4184_1": (23, 16, 12),
-    "D4184_2": (23, 16, 12),
-    "MP1584": (22, 17, 5),
-    "BUZZER": (12, 12, 9),
-}
+LCD = PARAMS["LCD"]                            # [실측] LCD1602 + I2C 백팩
+LC = PARAMS["LC"]                              # [실측] 1kg 바형 로드셀 (M4/M5 확인)
+MOD = PARAMS["MOD"]                            # [실측] 캐리어 판 위 소형 모듈 (가로×세로×높이)
+HINGE = PARAMS["HINGE"]                        # [실측] 25mm 소형 경첩
+USB_HOLE_SP = PARAMS["USB"]["hole_sp"]         # [실측] 마이크로USB 패널마운트 귀 구멍 간격
+DCJ_HOLE_D = PARAMS["DCJ"]["hole_d"]           # [실측] DC잭 나사 구멍 지름
+TB = PARAMS["TB"]                              # [실측] 12P 터미널블록
+TCS = PARAMS["TCS"]                            # [실측] TCS34725 보드 외형
 
 # ============================================================
 # 1. 도우미
@@ -172,7 +204,7 @@ door_cut = box(DOOR_X0, -1, DOOR_Z0, DOOR_X1, SKIN + 1, DOOR_Z1)
 front = front.cut(door_cut)
 INTAKE_C = (60, 41)                      # 흡기팬 중심 (x, z)
 front = front.cut(cyl("y", INTAKE_C, 19, -1, WALL + 1))          # 흡기 Ø38
-INTAKE_HOLES = [(INTAKE_C[0] + sx * 16, INTAKE_C[1] + sz * 16) for sx in (-1, 1) for sz in (-1, 1)]
+INTAKE_HOLES = [(INTAKE_C[0] + sx * FAN40["hole"] / 2, INTAKE_C[1] + sz * FAN40["hole"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
 for p in INTAKE_HOLES:
     front = front.cut(cyl("y", p, 1.7, -1, WALL + 1))
 LCD_C = (166.5, 48)                      # LCD 중심 (x, z)
@@ -185,7 +217,6 @@ for bx in BTN_X:
     front = front.cut(cyl("y", (bx, BTN_Z), 6.1, -1, WALL + 1))   # 12mm 메탈 푸시버튼
 # 경첩(왼쪽) 볼트 구멍, 자석 포켓(오른쪽)
 HINGE_Z = (DOOR_Z0 + 25, DOOR_Z1 - 50)   # 경첩 하단 z
-HINGE = dict(L=25, leaf=12, t=1.0, pin_x=-2.0, hole_off=10.5, hole_sp=12.5)  # [실측] 25mm 소형 경첩
 def hinge_hole_pts(z0):
     zc = z0 + HINGE["L"] / 2
     return [(HINGE["pin_x"] + HINGE["hole_off"], zc - HINGE["hole_sp"] / 2),
@@ -205,10 +236,10 @@ for z0 in PELT_Z:
     back = back.cut(box(CH_CX - 20, OUT - WALL - 1, z0, CH_CX + 20, OUT + 1, z0 + 40))
 DCJ = [(200, 40), (225, 40)]                       # DC잭 2 (1차·2차)
 for p in DCJ:
-    back = back.cut(cyl("y", p, 4.1, OUT - WALL - 1, OUT + 1))  # [실측] DC-022 M8 → Ø8.2
+    back = back.cut(cyl("y", p, DCJ_HOLE_D / 2, OUT - WALL - 1, OUT + 1))  # [실측] DC-022 M8 → Ø8.2
 USB_C = (165, 40)                                  # 마이크로USB 패널마운트
 back = back.cut(box(USB_C[0] - 6, OUT - WALL - 1, USB_C[1] - 4, USB_C[0] + 6, OUT + 1, USB_C[1] + 4))
-USB_HOLES = [(USB_C[0] - 14, USB_C[1]), (USB_C[0] + 14, USB_C[1])]   # [실측] 귀 구멍 간격 28
+USB_HOLES = [(USB_C[0] - USB_HOLE_SP / 2, USB_C[1]), (USB_C[0] + USB_HOLE_SP / 2, USB_C[1])]   # [실측] 귀 구멍 간격
 for p in USB_HOLES:
     back = back.cut(cyl("y", p, 1.7, OUT - WALL - 1, OUT + 1))
 SW_C = (255, 40)                                   # 로커 스위치 KCD1 컷아웃 19.2×12.9
@@ -340,7 +371,7 @@ for n, s in liners.items():
 FAN_C = (65, 48)                              # 순환팬 중심 (x, z)
 wall2 = box(IN0 + T05, WALL2_Y0, IN0 + T05, IN1 - T05, WALL2_Y1, DUCT_TOP)
 wall2 = wall2.cut(cyl("y", FAN_C, 28.5, WALL2_Y0 - 1, WALL2_Y1 + 1))
-FAN_HOLES = [(FAN_C[0] + sx * 25, FAN_C[1] + sz * 25) for sx in (-1, 1) for sz in (-1, 1)]
+FAN_HOLES = [(FAN_C[0] + sx * FAN60["hole"] / 2, FAN_C[1] + sz * FAN60["hole"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
 for p in FAN_HOLES:
     wall2 = wall2.cut(cyl("y", p, 1.7, WALL2_Y0 - 1, WALL2_Y1 + 1))
 WIRE_PASS = (200, 30)                         # 복귀실→플레넘 배선 통과 (그로밋)
@@ -452,7 +483,8 @@ for p in INSERT_SCREWS:
     count("M3 열압입 인서트 (L4)")
     bolt(f"S_insert_bolt_{p[0]}", "z", p, OZ, -1, 10)
 add("S01_sensor_insert_PETG_100x100", ins, C_PETG, "PETG", "3D프린트")
-add("S02_TCS34725_SEN0212", box(CH_CX - 11, CH_CY - 11, ins_z0 + 3, CH_CX + 11, CH_CY + 11, ins_z0 + 4.6), C_SENS, kind="buy",
+add("S02_TCS34725_SEN0212", box(CH_CX - TCS["w"] / 2, CH_CY - TCS["d"] / 2, ins_z0 + 3,
+                                  CH_CX + TCS["w"] / 2, CH_CY + TCS["d"] / 2, ins_z0 + 3 + TCS["t"]), C_SENS, kind="buy",
     note="[실측] 보드 외형")
 for dy in (-30, 30):
     add(f"S03_LED_strip_50mm_{'F' if dy < 0 else 'B'}", box(CH_CX - 25, CH_CY + dy - 4, ins_z0 + 1, CH_CX + 25, CH_CY + dy + 4, ins_z0 + 2),
@@ -541,7 +573,7 @@ ibox = ibox.cut(box(ix - 21.5, 33, iz + 20, ix + 21.5, 39, iz + 25))     # 활�
 ibox = ibox.cut(box(ix - 16, 49, iz + 20, ix + 16, 51.6, iz + 25))       # BME688 슬롯(위)
 ibox = ibox.cut(cyl("z", (ix + 18, 58), 3, iz + 20, iz + 25))            # 센서 선
 add("I01_intake_box_PETG", ibox, C_PETG, "PETG", "3D프린트", note="슬롯 위는 테이프로 막음")
-fan40 = box(ix - 20, ib_y0 + 3, iz - 20, ix + 20, ib_y0 + 3 + FAN40["t"], iz + 20).cut(cyl("y", INTAKE_C, 18.5, 0, 30))
+fan40 = box(ix - FAN40["s"] / 2, ib_y0 + 3, iz - FAN40["s"] / 2, ix + FAN40["s"] / 2, ib_y0 + 3 + FAN40["t"], iz + FAN40["s"] / 2).cut(cyl("y", INTAKE_C, 18.5, 0, 30))
 for p in INTAKE_HOLES:
     fan40 = fan40.cut(cyl("y", p, 1.7, 0, 30))
 add("I02_fan_40mm_intake_PWM", fan40, C_BLK, kind="buy")
@@ -561,7 +593,7 @@ for p in LCD_HOLES:
 lcd = lcd.union(box(LCD_C[0] - LCD["bez_w"] / 2, lcd_y0 - LCD["bez_t"] + 0.6, LCD_C[1] - LCD["bez_h"] / 2,
                     LCD_C[0] + LCD["bez_w"] / 2, lcd_y0, LCD_C[1] + LCD["bez_h"] / 2))
 lcd = lcd.union(box(LCD_C[0] - 21, lcd_y0 + 1.6, LCD_C[1] - 10, LCD_C[0] + 21, lcd_y0 + 13, LCD_C[1] + 10))   # I2C 백팩
-add("E10_LCD1602_I2C", lcd, (0.1, 0.4, 0.2), kind="buy", note="키트 보유. 구멍 75×31 [실측]")
+add("E10_LCD1602_I2C", lcd, (0.1, 0.4, 0.2), kind="buy", note=f"키트 보유. 구멍 {LCD['hx']}×{LCD['hz']} [실측]")
 for i, p in enumerate(LCD_HOLES):
     add(f"E10_spacer_{i}", cyl("y", p, 3, WALL, lcd_y0).cut(cyl("y", p, 1.6, WALL - 1, lcd_y0 + 1)), (0.9, 0.9, 0.9), kind="fastener")
     count("M3 나일론 스페이서 3mm")
@@ -629,20 +661,21 @@ for i, (x, y_) in enumerate(car_holes):
     bolt(f"E03_bolt_{i}", "z", (x, y_), SO_TOP + 3, -1, 8, spec="M3×8 냄비머리 볼트 (캐리어)")
 
 # 12V 분배 터미널블록 12P
-tb = box(135, 214, SO_TOP, 251, 234, SO_TOP + 17)
-tb_holes = [(139, 224), (247, 224)]
+TB_X0, TB_Y0 = 135, 214
+tb = box(TB_X0, TB_Y0, SO_TOP, TB_X0 + TB["w"], TB_Y0 + TB["d"], SO_TOP + TB["h"])
+tb_holes = [(TB_X0 + TB["w"] / 2 + sx * TB["hole_sp"] / 2, TB_Y0 + TB["d"] / 2) for sx in (-1, 1)]
 for p in tb_holes:
-    tb = tb.cut(cyl("z", p, 1.75, SO_TOP - 1, SO_TOP + 18))
-add("E05_terminal_block_12P", tb, C_BLK, kind="buy", note="[실측] 배리어형 116×20, 구멍 간격 108")
+    tb = tb.cut(cyl("z", p, 1.75, SO_TOP - 1, SO_TOP + TB["h"] + 1))
+add("E05_terminal_block_12P", tb, C_BLK, kind="buy", note=f"[실측] 배리어형 {TB['w']}×{TB['d']}, 구멍 간격 {TB['hole_sp']}")
 for i, (x, y_) in enumerate(tb_holes):
     so(f"E05_so_{i}", x, y_, 20)
-    bolt(f"E05_bolt_{i}", "z", (x, y_), SO_TOP + 17, -1, 20, spec="M3×20 냄비머리 볼트 (터미널블록)")
+    bolt(f"E05_bolt_{i}", "z", (x, y_), SO_TOP + TB["h"], -1, 20, spec="M3×20 냄비머리 볼트 (터미널블록)")
 
 # 순환팬 60mm (칸막이 앞면) + PETG 히터 덕트 + PTC
 fx, fz = FAN_C
 fan_y1 = WALL2_Y0
 fan_y0 = fan_y1 - FAN60["t"]
-fan60 = box(fx - 30, fan_y0, fz - 30, fx + 30, fan_y1, fz + 30).cut(cyl("y", FAN_C, 28.5, fan_y0 - 1, fan_y1 + 1))
+fan60 = box(fx - FAN60["s"] / 2, fan_y0, fz - FAN60["s"] / 2, fx + FAN60["s"] / 2, fan_y1, fz + FAN60["s"] / 2).cut(cyl("y", FAN_C, 28.5, fan_y0 - 1, fan_y1 + 1))
 for p in FAN_HOLES:
     fan60 = fan60.cut(cyl("y", p, FAN60["hd"] / 2, fan_y0 - 1, fan_y1 + 1))
 add("H01_fan_60mm_4pin_PWM", fan60, C_BLK, kind="buy")
@@ -769,7 +802,7 @@ add("X_P2_XL4016_buck", box(214, 200 - 0, SO_TOP + 3, 252, 200 + 0.1, SO_TOP + 4
 # 13. 저장
 # ============================================================
 def build_assembly(include_p2=True):
-    asm = cq.Assembly(name="herb_dryer_v2_9")
+    asm = cq.Assembly(name="herb_dryer")
     for p in PARTS:
         if p["phase"] == 2 and not include_p2:
             continue
@@ -777,8 +810,12 @@ def build_assembly(include_p2=True):
         asm.add(p["shape"], name=p["name"], color=cq.Color(*col) if len(col) == 4 else cq.Color(*col, 1.0))
     return asm
 
+REPO = Path(__file__).resolve().parent.parent
+
 if __name__ == "__main__":
     import json, sys
-    build_assembly().save("herb_dryer_v2_9.step")
+    outdir = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "build"
+    outdir.mkdir(parents=True, exist_ok=True)
+    build_assembly().export(str(outdir / "herb_dryer.step"))
     print("STEP saved, parts:", len(PARTS), "perforation holes:", N_PERF)
-    json.dump(FASTENERS, open("fasteners_v2_9.json", "w"), ensure_ascii=False, indent=1)
+    json.dump(FASTENERS, open(outdir / "fasteners.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)

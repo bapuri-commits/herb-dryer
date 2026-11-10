@@ -1,0 +1,98 @@
+# ============================================================
+# herb-dryer 실측 파라미터
+# ------------------------------------------------------------
+# CAD(cad/herb_dryer_cad.py)가 시작할 때 이 파일을 읽는다.
+# 부품이 도착해 실측하면 해당 값의 value / status / source 만 바꿔서 PR 한다.
+#   → params.yaml 만 바뀐 PR = 패치 버전 (예: v2.9.0 → v2.9.1)
+#
+# 값마다:
+#   value  : 숫자 (mm). 모듈 크기는 [가로, 세로, 높이]
+#   status : 가정 | 판매처 표기 | 실측
+#   source : URL, 또는 "측정자 YYYY-MM-DD" (status가 실측이면 필수)
+# 그룹의 bom 은 BOM xlsx "1차 BOM" 시트의 No.
+# 키 이름은 CAD 스크립트 안의 변수 이름과 같다 (예: PTC.w → PTC["w"]).
+# ============================================================
+
+PTC:   # PTC 80W 핀 발열체 → H02 히터 덕트, H03, H04
+  bom: 8
+  w: {value: 70, status: 가정, source: "v2.9 초기값 (x폭). 주문 후 실측"}
+  d: {value: 26, status: 가정, source: "v2.9 초기값 (y, 공기 방향 두께)"}
+  h: {value: 35, status: 가정, source: "v2.9 초기값 (z높이)"}
+
+EXP:   # ESP32 38핀 확장보드 → 스탠드오프 4개 위치 (E01)
+  bom: 21
+  w:     {value: 78,  status: 가정, source: "판매처마다 68~78. 큰 쪽 가정"}
+  d:     {value: 63,  status: 가정, source: "판매처마다 53~63. 큰 쪽 가정"}
+  t:     {value: 1.6, status: 가정, source: "일반 PCB 두께"}
+  inset: {value: 3.5, status: 가정, source: "구멍 중심이 모서리에서 3.5 안쪽 가정"}
+
+LC:    # 1kg 바형 로드셀 → L01·L03 블록, 타공판 구멍, M4 볼트
+  bom: 5
+  L:        {value: 80,   status: 가정, source: "Voltly VLT-LCS002 일반 규격 (구매완료 11/7, 실측 전)"}
+  s:        {value: 12.7, status: 가정, source: "단면 12.7각 일반 규격"}
+  hole_sp:  {value: 15,   status: 가정, source: "구멍 간격 가정"}
+  hole_end: {value: 7.5,  status: 가정, source: "끝에서 첫 구멍까지 가정"}
+  thread:   {value: 4,    status: 가정, source: "M4 가정 (M5일 수 있음)"}
+
+LCD:   # LCD1602 + I2C 백팩 (키트 보유) → 앞판 창·구멍 (E10)
+  bom: 키트
+  w:     {value: 80, status: 가정, source: "LCD1602 일반 규격"}
+  h:     {value: 36, status: 가정, source: "LCD1602 일반 규격"}
+  hx:    {value: 75, status: 가정, source: "구멍 간격 가로 75 가정 (실측 필요)"}
+  hz:    {value: 31, status: 가정, source: "구멍 간격 세로 31 가정 (실측 필요)"}
+  bez_w: {value: 71, status: 가정, source: "베젤 가정"}
+  bez_h: {value: 24, status: 가정, source: "베젤 가정"}
+  bez_t: {value: 7,  status: 가정, source: "베젤 두께 가정"}
+
+FAN60: # 60mm 순환팬 → 칸막이 P04 구멍, 히터 덕트 플랜지
+  bom: 9
+  s:    {value: 60,  status: 판매처 표기, source: "60×60×25 표준 규격"}
+  t:    {value: 25,  status: 판매처 표기, source: "60×60×25 표준 규격"}
+  hole: {value: 50,  status: 판매처 표기, source: "60mm 팬 표준 구멍 간격"}
+  hd:   {value: 4.3, status: 가정, source: "팬 구멍 지름 가정"}
+
+FAN40: # 40mm 흡기팬 → 흡기 박스 I01, 앞판 구멍
+  bom: 10
+  s:    {value: 40,  status: 판매처 표기, source: "https://www.icbanq.com/P005700974"}
+  t:    {value: 10,  status: 판매처 표기, source: "40×40×10 (NF-A4x10 / FC4040B)"}
+  hole: {value: 32,  status: 판매처 표기, source: "40mm 팬 표준 구멍 간격"}
+  hd:   {value: 3.4, status: 가정, source: "팬 구멍 지름 가정"}
+
+HINGE: # 25mm 소형 맞대기 경첩 → 앞판·문 구멍 (D06)
+  bom: 35
+  L:        {value: 25,   status: 가정, source: "25mm 경첩"}
+  leaf:     {value: 12,   status: 가정, source: "날개 폭 ~12 (BOM 규격)"}
+  t:        {value: 1.0,  status: 가정, source: "판 두께 가정"}
+  pin_x:    {value: -2.0, status: 가정, source: "핀 중심 x (앞판 왼쪽 모서리 밖)"}
+  hole_off: {value: 10.5, status: 가정, source: "핀 중심 → 구멍 중심 거리 가정"}
+  hole_sp:  {value: 12.5, status: 가정, source: "구멍 간격 가정"}
+
+MOD:   # 캐리어 판 위 소형 모듈 [가로, 세로, 높이] → E03 캐리어 포켓
+  bom: "22, 6, 11, 17, 15"
+  SD:      {value: [42, 24, 8],  status: 가정, source: "마이크로SD 모듈 일반 크기 (BOM 22)"}
+  HX711:   {value: [34, 20, 6],  status: 가정, source: "HX711 일반 크기 (BOM 6, 구매완료 11/7)"}
+  D4184_1: {value: [23, 16, 12], status: 가정, source: "D4184 모듈 일반 크기 (BOM 11)"}
+  D4184_2: {value: [23, 16, 12], status: 가정, source: "D4184 모듈 일반 크기 (BOM 11)"}
+  MP1584:  {value: [22, 17, 5],  status: 가정, source: "판매처 표기 22×17×4 (https://www.icbanq.com/P008113809), 높이는 부품 포함 5 가정"}
+  BUZZER:  {value: [12, 12, 9],  status: 가정, source: "12mm 패시브 부저 (BOM 15)"}
+
+USB:   # 마이크로USB 패널마운트 → 뒷판 귀 구멍 (E09)
+  bom: 23
+  hole_sp: {value: 28, status: 가정, source: "귀 구멍 간격 28 가정"}
+
+DCJ:   # DC잭 5.5×2.1 패널형 ×2 → 뒷판 구멍 (E09)
+  bom: 18
+  hole_d: {value: 8.2, status: 가정, source: "DC-022 M8 나사 가정 → Ø8.2"}
+
+TB:    # 12V 분배 터미널블록 12P → 스탠드오프 2개 위치 (E05)
+  bom: 24
+  w:       {value: 116, status: 가정, source: "배리어형 116×20 가정"}
+  d:       {value: 20,  status: 가정, source: "배리어형 116×20 가정"}
+  h:       {value: 17,  status: 가정, source: "높이 가정"}
+  hole_sp: {value: 108, status: 가정, source: "구멍 간격 108 가정"}
+
+TCS:   # TCS34725 (DFRobot SEN0212) → 천장 센서 인서트 S01 포켓 안 보드
+  bom: 1
+  w: {value: 22,  status: 가정, source: "보드 외형 22×22 가정"}
+  d: {value: 22,  status: 가정, source: "보드 외형 22×22 가정"}
+  t: {value: 1.6, status: 가정, source: "PCB 두께"}
