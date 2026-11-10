@@ -1,5 +1,5 @@
 """
-허브 건조기 v2.9 — 제작용 CadQuery 모델
+허브 건조기 v2.10 — 제작용 CadQuery 모델 (v2.10 변경은 CHANGELOG.md)
 좌표: X=폭(좌→우), Y=깊이(앞=0 → 뒤=300), Z=높이(바닥=0). 단위 mm.
 
 v2.8 → v2.9 주요 변경
@@ -86,17 +86,22 @@ SO_Z = WALL                     # 스탠드오프 시작 높이(바닥판 윗면
 # 구매 부품 치수 — [실측] 값은 params.yaml 에서
 FAN60 = PARAMS["FAN60"]                        # 60mm 순환팬 (s, t, hole, hd)
 FAN40 = PARAMS["FAN40"]                        # 40mm 흡기팬
-PTC = PARAMS["PTC"]                            # [실측] PTC 80W 핀 (x폭, y공기방향 두께, z높이)
+PTC = PARAMS["PTC"]                            # [실측] PTC 50W 핀 (w=귀 포함 길이 x, d=공기 방향 y, h=높이 z)
 EXP = PARAMS["EXP"]                            # [실측] ESP32 38핀 확장보드 (판매처마다 68~78×53~63)
 DEVKIT = dict(w=27.9, d=54.4, t=1.6)           # ESP32 DevKitC V4 (공식 54.4×27.9)
 LCD = PARAMS["LCD"]                            # [실측] LCD1602 + I2C 백팩
 LC = PARAMS["LC"]                              # [실측] 1kg 바형 로드셀 (M4/M5 확인)
 MOD = PARAMS["MOD"]                            # [실측] 캐리어 판 위 소형 모듈 (가로×세로×높이)
 HINGE = PARAMS["HINGE"]                        # [실측] 25mm 소형 경첩
-USB_HOLE_SP = PARAMS["USB"]["hole_sp"]         # [실측] 마이크로USB 패널마운트 귀 구멍 간격
-DCJ_HOLE_D = PARAMS["DCJ"]["hole_d"]           # [실측] DC잭 나사 구멍 지름
-TB = PARAMS["TB"]                              # [실측] 12P 터미널블록
-TCS = PARAMS["TCS"]                            # [실측] TCS34725 보드 외형
+USBP = PARAMS["USB"]                           # 마이크로USB 패널마운트 Adafruit 3258
+USB_HOLE_SP = USBP["hole_sp"]
+PWR = PARAMS["PWR"]                            # 전원 인입 PG7 케이블 글랜드 (패널 DC잭 삭제, v2.10)
+WAGO = PARAMS["WAGO"]                          # WAGO 221-415 (12P 터미널블록 대체, v2.10)
+MOS = PARAMS["MOS"]                            # DFR0457 장착 구멍
+TCS = PARAMS["TCS"]                            # TCS34725 보드 외형
+SHT = PARAMS["SHT"]                            # SHT31 보드
+BME = PARAMS["BME"]                            # BME688 보드
+KSD = PARAMS["KSD"]                            # 서모스탯 KSD301
 
 # ============================================================
 # 1. 도우미
@@ -234,16 +239,19 @@ back = box(WALL, OUT - WALL, 0, OUT - WALL, OUT, WALL_H)
 PELT_Z = (105, 165)
 for z0 in PELT_Z:
     back = back.cut(box(CH_CX - 20, OUT - WALL - 1, z0, CH_CX + 20, OUT + 1, z0 + 40))
-DCJ = [(200, 40), (225, 40)]                       # DC잭 2 (1차·2차)
-for p in DCJ:
-    back = back.cut(cyl("y", p, DCJ_HOLE_D / 2, OUT - WALL - 1, OUT + 1))  # [실측] DC-022 M8 → Ø8.2
+GLAND_C = (215, 35)                                # 전원 케이블 글랜드 PG7 (어댑터 플러그를 잘라 넣음)
+back = back.cut(cyl("y", GLAND_C, PWR["gland_d"] / 2, OUT - WALL - 1, OUT + 1))
 USB_C = (165, 40)                                  # 마이크로USB 패널마운트
-back = back.cut(box(USB_C[0] - 6, OUT - WALL - 1, USB_C[1] - 4, USB_C[0] + 6, OUT + 1, USB_C[1] + 4))
-USB_HOLES = [(USB_C[0] - USB_HOLE_SP / 2, USB_C[1]), (USB_C[0] + USB_HOLE_SP / 2, USB_C[1])]   # [실측] 귀 구멍 간격
+back = back.cut(box(USB_C[0] - USBP["cut_w"] / 2, OUT - WALL - 1, USB_C[1] - USBP["cut_h"] / 2,
+                    USB_C[0] + USBP["cut_w"] / 2, OUT + 1, USB_C[1] + USBP["cut_h"] / 2))
+back = back.cut(box(USB_C[0] - USBP["plug_w"] / 2, OUT - WALL + 1, USB_C[1] - USBP["plug_h"] / 2,
+                    USB_C[0] + USBP["plug_w"] / 2, OUT + 1, USB_C[1] + USBP["plug_h"] / 2))     # 바깥 포켓 깊이 4 (플러그 몰딩)
+USB_HOLES = [(USB_C[0] - USB_HOLE_SP / 2, USB_C[1]), (USB_C[0] + USB_HOLE_SP / 2, USB_C[1])]
 for p in USB_HOLES:
-    back = back.cut(cyl("y", p, 1.7, OUT - WALL - 1, OUT + 1))
+    back = back.cut(cyl("y", p, 1.6, OUT - WALL - 1, OUT + 1))
 SW_C = (255, 40)                                   # 로커 스위치 KCD1 컷아웃 19.2×12.9
 back = back.cut(box(SW_C[0] - 9.6, OUT - WALL - 1, SW_C[1] - 6.45, SW_C[0] + 9.6, OUT + 1, SW_C[1] + 6.45))
+back = back.cut(box(SW_C[0] - 12.5, OUT - WALL - 1, SW_C[1] - 9, SW_C[0] + 12.5, OUT - 1, SW_C[1] + 9))   # 안쪽 카운터보어: 판 1mm 남김 (스냅 클립)
 back = back.cut(cyl("y", (CH_CX, 230), 1.7, OUT - WALL - 1, OUT + 1))      # BME688 #1 홀더 볼트
 add("P03_back_foamex5T", back, C_FOAMEX, "포맥스 5T", "재단")
 
@@ -288,8 +296,7 @@ for bx in BTN_X:
 foam_B = box(IN0, OUT - IN0, IN0, IN1, OUT - WALL, LID_Z)
 for z0 in PELT_Z:
     foam_B = foam_B.cut(box(CH_CX - 20, OUT - IN0 - 1, z0, CH_CX + 20, OUT - WALL + 1, z0 + 40))
-for p in DCJ:
-    foam_B = foam_B.cut(cyl("y", p, 7, OUT - IN0 - 1, OUT - WALL + 1))
+foam_B = foam_B.cut(cyl("y", GLAND_C, PWR["nut_od"] / 2 + 2, OUT - IN0 - 1, OUT - WALL + 1))   # 글랜드 너트
 foam_B = foam_B.cut(box(USB_C[0] - 20, OUT - IN0 - 1, USB_C[1] - 10, USB_C[0] + 20, OUT - WALL + 1, USB_C[1] + 10))
 foam_B = foam_B.cut(box(SW_C[0] - 13, OUT - IN0 - 1, SW_C[1] - 10, SW_C[0] + 13, OUT - WALL + 1, SW_C[1] + 10))
 foam_B = foam_B.cut(box(CH_CX - 8, OUT - IN0 - 1, 230 - 8, CH_CX + 8, OUT - WALL + 1, 230 + 8))  # BME688 #1 너트 포켓
@@ -341,8 +348,7 @@ ANT_WIN = (159, 189, 30, 50)            # ESP32 안테나 창 (x0,x1,z0,z1)
 bay_F = bay_F.cut(box(ANT_WIN[0], IN0 - 1, ANT_WIN[2], ANT_WIN[1], IN0 + 2, ANT_WIN[3]))
 # 앞쪽 전장부 라이너는 생략: ESP32 Wi-Fi/BT 전파가 앞판(포맥스·폼)으로 나가게. 앞쪽 플레넘 온도 45~50°C는 폼·포맥스 허용 범위
 bay_B = box(IN0 + T05, IN1 - T05, IN0 + T05, IN1 - T05, IN1, FLOOR_Z)
-for p in DCJ:
-    bay_B = bay_B.cut(cyl("y", p, 7, IN1 - 2, IN1 + 1))
+bay_B = bay_B.cut(cyl("y", GLAND_C, PWR["nut_od"] / 2 + 1, IN1 - 2, IN1 + 1))
 bay_B = bay_B.cut(box(USB_C[0] - 20, IN1 - 2, USB_C[1] - 10, USB_C[0] + 20, IN1 + 1, USB_C[1] + 10))
 bay_B = bay_B.cut(box(SW_C[0] - 13, IN1 - 2, SW_C[1] - 10, SW_C[0] + 13, IN1 + 1, SW_C[1] + 10))
 liners["A03_liner_bay_back_269x64.5"] = bay_B
@@ -471,7 +477,8 @@ add("T02_tray_mesh_241x211", mesh, (0.8, 0.8, 0.82, 0.5), "스테인리스/PP �
 # ============================================================
 ins_z0, ins_z1 = LID_Z - T05, LID_Z + INS
 ins = box(CH_CX - 50, CH_CY - 50, ins_z0, CH_CX + 50, CH_CY + 50, ins_z1)
-ins = ins.cut(box(CH_CX - 12, CH_CY - 12, ins_z0 + 3, CH_CX + 12, CH_CY + 12, ins_z1 + 1))   # TCS 포켓(위에서)
+ins = ins.cut(box(CH_CX - TCS["w"] / 2 - 0.5, CH_CY - TCS["d"] / 2 - 0.5, ins_z0 + 3,
+                  CH_CX + TCS["w"] / 2 + 0.5, CH_CY + TCS["d"] / 2 + 0.5, ins_z1 + 1))   # TCS 포켓(위에서, 보드+0.5)
 ins = ins.cut(cyl("z", (CH_CX, CH_CY), 3, ins_z0 - 1, ins_z0 + 4))                              # 시야창 Ø6
 for dy in (-30, 30):                                                                             # LED 홈 2줄 (5cm×2)
     ins = ins.cut(box(CH_CX - 26, CH_CY + dy - 4.5, ins_z0 - 1, CH_CX + 26, CH_CY + dy + 4.5, ins_z0 + 2))
@@ -485,7 +492,7 @@ for p in INSERT_SCREWS:
 add("S01_sensor_insert_PETG_100x100", ins, C_PETG, "PETG", "3D프린트")
 add("S02_TCS34725_SEN0212", box(CH_CX - TCS["w"] / 2, CH_CY - TCS["d"] / 2, ins_z0 + 3,
                                   CH_CX + TCS["w"] / 2, CH_CY + TCS["d"] / 2, ins_z0 + 3 + TCS["t"]), C_SENS, kind="buy",
-    note="[실측] 보드 외형")
+    note="DFRobot 레이아웃 18.51×23, 구멍 없음 → 포켓에 끼우고 위에서 폼으로 누름")
 for dy in (-30, 30):
     add(f"S03_LED_strip_50mm_{'F' if dy < 0 else 'B'}", box(CH_CX - 25, CH_CY + dy - 4, ins_z0 + 1, CH_CX + 25, CH_CY + dy + 4, ins_z0 + 2),
         (1, 1, 0.85), kind="buy")
@@ -499,21 +506,38 @@ add("S05_exhaust_flap_PET0.3", box(EXH[0] - 4, EXH[1] - 2, OZ + 3, EXH[2] + 4, E
 # 8. 챔버 센서: SHT31(왼벽), BME688 #1(덕트 전실, 뒷벽)
 # ============================================================
 sht_x0 = IN0 + T05
-sht_h = box(sht_x0, SHT_P[0] - 12, SHT_P[1] - 10, sht_x0 + 5, SHT_P[0] + 12, SHT_P[1] + 10) \
-    .cut(cyl("x", SHT_P, 1.7, sht_x0 - 1, sht_x0 + 6))
-add("C01_SHT31_holder_PETG_5mm", sht_h, C_PETG, "PETG", "3D프린트", note="벽 관통 볼트 1개")
-add("C02_SHT31_SEN0331", box(sht_x0 + 5, SHT_P[0] - 9.5, SHT_P[1] - 8, sht_x0 + 6.6, SHT_P[0] + 9.5, SHT_P[1] + 8)
-    .cut(cyl("x", SHT_P, 1.7, sht_x0 + 4, sht_x0 + 8)), C_SENS, kind="buy")
-bolt("C_bolt_SHT31", "x", SHT_P, 0, +1, 25)
-nut("C_nut_SHT31", "x", SHT_P, sht_x0 + 6.6, +1)
+SH_T = 6                                      # 홀더 두께
+sh_face = sht_x0 + SH_T
+sht_h = box(sht_x0, SHT_P[0] - 12, SHT_P[1] - 10, sh_face, SHT_P[0] + 12, SHT_P[1] + 10) \
+    .cut(cyl("x", SHT_P, 1.7, sht_x0 - 1, sh_face + 1))
+sht_h = sht_h.cut(cq.Workplane("YZ").polygon(6, 5.7 / math.cos(math.pi / 6)).extrude(4.1).translate((sh_face - 4, SHT_P[0], SHT_P[1])))  # 너트 포켓
+SHT_HOLES = [(SHT_P[0] + sy * SHT["hole_sp"] / 2, SHT_P[1] + SHT["h"] / 2 - SHT["hole_edge"]) for sy in (-1, 1)]
+for p in SHT_HOLES:
+    sht_h = sht_h.cut(cyl("x", p, 0.8, sh_face - 6, sh_face + 1))                       # M2 셀프태핑 Ø1.6
+add("C01_SHT31_holder_PETG_6mm", sht_h, C_PETG, "PETG", "3D프린트", note="벽 관통 M3 1개(너트는 포켓), 보드는 M2×6 셀프태핑 2개")
+sb = box(sh_face, SHT_P[0] - SHT["w"] / 2, SHT_P[1] - SHT["h"] / 2, sh_face + SHT["t"], SHT_P[0] + SHT["w"] / 2, SHT_P[1] + SHT["h"] / 2)
+for p in SHT_HOLES:
+    sb = sb.cut(cyl("x", p, SHT["hole_d"] / 2, sh_face - 1, sh_face + 2))
+add("C02_SHT31_SEN0331", sb, C_SENS, kind="buy")
+bolt("C_bolt_SHT31", "x", SHT_P, 0, +1, 20)
+nut("C_nut_SHT31", "x", SHT_P, sh_face - 4 + 0.05, +1)
+for i, p in enumerate(SHT_HOLES):
+    s_ = cyl("x", p, 0.8, sh_face - 4.6, sh_face + SHT["t"]).union(cyl("x", p, 1.9, sh_face + SHT["t"], sh_face + SHT["t"] + 1.3))
+    add(f"C_screw_SHT31_{i}", s_, C_BOLT, kind="fastener")
+    count("M2×6 셀프태핑 나사 (SHT31)")
 
 bme1_y1 = IN1 - T05
-bme1_h = box(CH_CX - 17, bme1_y1 - 5, 230 - 13, CH_CX + 17, bme1_y1, 230 + 13).cut(cyl("y", (CH_CX, 230), 1.7, bme1_y1 - 6, bme1_y1 + 1))
-add("C03_BME688_1_holder_PETG", bme1_h, C_PETG, "PETG", "3D프린트")
-add("C04_BME688_1_SEN0617", box(CH_CX - 15, bme1_y1 - 6.6, 230 - 11, CH_CX + 15, bme1_y1 - 5, 230 + 11)
-    .cut(cyl("y", (CH_CX, 230), 1.7, bme1_y1 - 8, bme1_y1)), C_SENS, kind="buy")
-bolt("C_bolt_BME1", "y", (CH_CX, 230), OUT, -1, 25)
-nut("C_nut_BME1", "y", (CH_CX, 230), bme1_y1 - 6.6, -1)
+BM_T = 6
+bm_face = bme1_y1 - BM_T
+bme1_h = box(CH_CX - 18, bm_face, 230 - 14, CH_CX + 18, bme1_y1, 230 + 14).cut(cyl("y", (CH_CX, 230), 1.7, bm_face - 1, bme1_y1 + 1))
+bme1_h = bme1_h.union(box(CH_CX - 18, bm_face - 1.2, 230 - 14, CH_CX + 18, bm_face, 230 + 14)
+                      .cut(box(CH_CX - BME["w"] / 2 - 0.3, bm_face - 2, 230 - BME["h"] / 2 - 0.3, CH_CX + BME["w"] / 2 + 0.3, bm_face + 1, 230 + BME["h"] / 2 + 0.3)))  # 보드 테두리
+bme1_h = bme1_h.cut(cq.Workplane("XZ").polygon(6, 5.7 / math.cos(math.pi / 6)).extrude(-4.1).translate((CH_CX, bm_face - 0.05, 230)))  # 너트 포켓
+add("C03_BME688_1_holder_PETG", bme1_h, C_PETG, "PETG", "3D프린트", note="보드는 테두리 안에 VHB 양면테이프")
+add("C04_BME688_1_SEN0617", box(CH_CX - BME["w"] / 2, bm_face - BME["t"], 230 - BME["h"] / 2, CH_CX + BME["w"] / 2, bm_face, 230 + BME["h"] / 2),
+    C_SENS, kind="buy")
+bolt("C_bolt_BME1", "y", (CH_CX, 230), OUT, -1, 20)
+nut("C_nut_BME1", "y", (CH_CX, 230), bm_face + 4 - 0.05, -1)
 
 # 케이블 클립 (챔버 오른쪽 앞 모서리, 3M 양면) 4개
 for k, z in enumerate((100, 140, 180, 220)):
@@ -624,7 +648,7 @@ for p in exp_holes:
     expb = expb.cut(cyl("z", p, 1.6, SO_TOP - 1, SO_TOP + 3))
 expb = expb.union(box(ex0 + 2, ey0 + 9, SO_TOP + EXP["t"], ex0 + 9, ey0 + EXP["d"] - 9, SO_TOP + EXP["t"] + 10))     # 나사 터미널 열
 expb = expb.union(box(ex0 + EXP["w"] - 9, ey0 + 9, SO_TOP + EXP["t"], ex0 + EXP["w"] - 2, ey0 + EXP["d"] - 9, SO_TOP + EXP["t"] + 10))
-add("E01_ESP32_38pin_expansion_board", expb, C_PCB, kind="buy", note="[실측] 외형·구멍 위치 판매처마다 다름")
+add("E01_ESP32_38pin_expansion_board", expb, C_PCB, kind="buy", note="CMODULE-47 78×52.5. 구멍 위치는 도착 후 실측")
 dk_x0 = ex0 + EXP["w"] / 2 - DEVKIT["w"] / 2
 dk_z0 = SO_TOP + EXP["t"] + 8.5
 devkit = box(dk_x0, ey0 + 4, dk_z0, dk_x0 + DEVKIT["w"], ey0 + 4 + DEVKIT["d"], dk_z0 + DEVKIT["t"])
@@ -635,53 +659,105 @@ for i, (x, y) in enumerate(exp_holes):
     so(f"E01_so_{i}", x, y, 20)
     bolt(f"E01_bolt_{i}", "z", (x, y), SO_TOP + EXP["t"], -1, 6, spec="M3×6 냄비머리 볼트 (보드→스탠드오프)")
 
-# 모듈 캐리어 판 (PETG 3T)
-cx0, cy0, cx1, cy1 = 214, 48, 280, 196
+# 모듈 캐리어 판 (PETG 3T) — v2.10: DFR0457 MOSFET 2개(볼트 4개씩), SD·HX711·MP1584·부저 모듈(포켓+케이블타이)
+cx0, cy0, cx1, cy1 = 214, 36, 280, 206
 carrier = box(cx0, cy0, SO_TOP, cx1, cy1, SO_TOP + 3)
 car_holes = [(cx0 + 4, cy0 + 4), (cx1 - 4, cy0 + 4), (cx0 + 4, cy1 - 4), (cx1 - 4, cy1 - 4)]
 for p in car_holes:
     carrier = carrier.cut(cyl("z", p, 1.7, SO_TOP - 1, SO_TOP + 4))
-y = cy0 + 10
+MOS_SPACER = 3                                 # DFR0457 아래 나일론 스페이서 (스루홀 단자 다리 여유)
+y = cy0 + 5
 mod_pos = {}
+mos_bolts = []
 for k, (w, d, h) in MOD.items():
     mx0 = (cx0 + cx1) / 2 - w / 2
-    rim = box(mx0 - 2, y - 2, SO_TOP + 3, mx0 + w + 2, y + d + 2, SO_TOP + 5).cut(box(mx0 - 0.3, y - 0.3, SO_TOP + 2, mx0 + w + 0.3, y + d + 0.3, SO_TOP + 6))
-    carrier = carrier.union(rim)
-    for sx in (mx0 - 6, mx0 + w + 3):          # 케이블타이 슬롯
-        carrier = carrier.cut(box(sx, y + d / 2 - 2, SO_TOP - 1, sx + 3, y + d / 2 + 2, SO_TOP + 4))
+    if k.startswith("MOS"):
+        hx1 = mx0 + w - MOS["hole_edge"]
+        pts_ = [(hx1 - sx * MOS["hole_sp_x"], y + MOS["hole_edge"] + sy * MOS["hole_sp_y"]) for sx in (0, 1) for sy in (0, 1)]
+        for p in pts_:
+            carrier = carrier.cut(cyl("z", p, 1.7, SO_TOP - 1, SO_TOP + 4))
+        mos_bolts.append((k, pts_))
+    else:
+        rim = box(mx0 - 2, y - 2, SO_TOP + 3, mx0 + w + 2, y + d + 2, SO_TOP + 5).cut(box(mx0 - 0.3, y - 0.3, SO_TOP + 2, mx0 + w + 0.3, y + d + 0.3, SO_TOP + 6))
+        carrier = carrier.union(rim)
+        for sx in (mx0 - 5.5, mx0 + w + 2.5):      # 케이블타이 슬롯
+            carrier = carrier.cut(box(sx, y + d / 2 - 2, SO_TOP - 1, sx + 3, y + d / 2 + 2, SO_TOP + 4))
     mod_pos[k] = (mx0, y, w, d, h)
-    y += d + 6
-add("E03_module_carrier_PETG_66x148", carrier, C_PETG, "PETG", "3D프린트", note="모듈 포켓 + 케이블타이 슬롯")
+    y += d + 4
+add("E03_module_carrier_PETG_66x170", carrier, C_PETG, "PETG", "3D프린트", note="DFR0457 2개는 M3 볼트, 나머지 모듈은 포켓 + 케이블타이")
 for k, (mx0, my0, w, d, h) in mod_pos.items():
-    col = C_PCB if k != "BUZZER" else C_BLK
-    shp = box(mx0, my0, SO_TOP + 3, mx0 + w, my0 + d, SO_TOP + 3 + h) if k != "BUZZER" else cyl("z", (mx0 + 6, my0 + 6), 6, SO_TOP + 3, SO_TOP + 3 + h)
-    add(f"E04_{k}", shp, col, kind="buy")
+    z0 = SO_TOP + 3 + (MOS_SPACER if k.startswith("MOS") else 0)
+    shp = box(mx0, my0, z0, mx0 + w, my0 + d, z0 + 1.6).union(box(mx0 + 2, my0 + 2, z0 + 1.6, mx0 + min(w, 14), my0 + d - 2, z0 + h)) \
+        if k.startswith("MOS") else box(mx0, my0, z0, mx0 + w, my0 + d, z0 + h)
+    if k.startswith("MOS"):
+        for (_, pts_) in [mb for mb in mos_bolts if mb[0] == k]:
+            for p in pts_:
+                shp = shp.cut(cyl("z", p, MOS["hole_d"] / 2, z0 - 1, z0 + 3))
+    add(f"E04_{k}" + ("_DFR0457" if k.startswith("MOS") else ""), shp, C_PCB if k != "BUZZER" else C_BLK, kind="buy")
+for k, pts_ in mos_bolts:
+    for i, p in enumerate(pts_):
+        z0 = SO_TOP + 3
+        add(f"E04_{k}_spacer_{i}", cyl("z", p, 3, z0, z0 + MOS_SPACER).cut(cyl("z", p, 1.6, z0 - 1, z0 + MOS_SPACER + 1)), (0.9, 0.9, 0.9), kind="fastener")
+        count("M3 나일론 스페이서 3mm")
+        bolt(f"E04_{k}_bolt_{i}", "z", p, z0 + MOS_SPACER + 1.6, -1, 12, spec="M3×12 냄비머리 볼트 (DFR0457)")
+        nut(f"E04_{k}_nut_{i}", "z", p, SO_TOP, -1)
 for i, (x, y_) in enumerate(car_holes):
     so(f"E03_so_{i}", x, y_, 20)
     bolt(f"E03_bolt_{i}", "z", (x, y_), SO_TOP + 3, -1, 8, spec="M3×8 냄비머리 볼트 (캐리어)")
 
-# 12V 분배 터미널블록 12P
-TB_X0, TB_Y0 = 135, 214
-tb = box(TB_X0, TB_Y0, SO_TOP, TB_X0 + TB["w"], TB_Y0 + TB["d"], SO_TOP + TB["h"])
-tb_holes = [(TB_X0 + TB["w"] / 2 + sx * TB["hole_sp"] / 2, TB_Y0 + TB["d"] / 2) for sx in (-1, 1)]
-for p in tb_holes:
-    tb = tb.cut(cyl("z", p, 1.75, SO_TOP - 1, SO_TOP + TB["h"] + 1))
-add("E05_terminal_block_12P", tb, C_BLK, kind="buy", note=f"[실측] 배리어형 {TB['w']}×{TB['d']}, 구멍 간격 {TB['hole_sp']}")
-for i, (x, y_) in enumerate(tb_holes):
+# 12V 분배: WAGO 221-415 ×4 를 PETG 홀더에 (v2.10, 12P 터미널블록 대체)
+WG_X0, WG_Y0 = 148, 203
+wg_pitch = WAGO["w"] + 2.2
+wg_w = 2 * 8 + WAGO["n"] * wg_pitch
+wg_d = WAGO["d"] + 4
+wholder = box(WG_X0, WG_Y0, SO_TOP, WG_X0 + wg_w, WG_Y0 + wg_d, SO_TOP + 3)
+for i in range(int(WAGO["n"]) + 1):                     # 칸막이 벽
+    xw = WG_X0 + 8 + i * wg_pitch - 1.1
+    wholder = wholder.union(box(xw, WG_Y0 + 2, SO_TOP + 3, xw + 1.1, WG_Y0 + wg_d - 2, SO_TOP + 12))
+wg_holes = [(WG_X0 + 4, WG_Y0 + wg_d / 2), (WG_X0 + wg_w - 4, WG_Y0 + wg_d / 2)]
+for p in wg_holes:
+    wholder = wholder.cut(cyl("z", p, 1.7, SO_TOP - 1, SO_TOP + 4))
+add("E05_WAGO_holder_PETG", wholder, C_PETG, "PETG", "3D프린트", note="WAGO 221-415 4개 칸, 케이블타이로 묶음")
+for i in range(int(WAGO["n"])):
+    xw = WG_X0 + 8 + i * wg_pitch + 0.05
+    add(f"E05_WAGO_221-415_{i+1}", box(xw, WG_Y0 + 2, SO_TOP + 3, xw + WAGO["w"] - 0.1, WG_Y0 + 2 + WAGO["d"], SO_TOP + 3 + WAGO["h"]),
+        (0.85, 0.85, 0.85), kind="buy", note="12V 2개, GND 2개")
+for i, (x, y_) in enumerate(wg_holes):
     so(f"E05_so_{i}", x, y_, 20)
-    bolt(f"E05_bolt_{i}", "z", (x, y_), SO_TOP + TB["h"], -1, 20, spec="M3×20 냄비머리 볼트 (터미널블록)")
+    bolt(f"E05_bolt_{i}", "z", (x, y_), SO_TOP + 3, -1, 8, spec="M3×8 냄비머리 볼트 (WAGO 홀더)")
 
-# 순환팬 60mm (칸막이 앞면) + PETG 히터 덕트 + PTC
+# 서모스탯 KSD301 모델 (캡 + 브래킷 + 단자 몸체), axis 방향으로 캡이 향함
+def ksd(name, base, axis_dir, color=(0.85, 0.1, 0.1), note=""):
+    """base=(x,y,z) 브래킷 캡쪽 면 중심. axis_dir=+1/-1 (x축 방향으로 캡). 브래킷 구멍은 y 방향 ±br_hole_sp/2"""
+    bx, by, bz = base
+    cap = cyl("x", (by, bz), KSD["cap_d"] / 2, *sorted((bx, bx + axis_dir * KSD["body_h"])))
+    x0, x1 = sorted((bx, bx - axis_dir * KSD["br_t"]))
+    br = box(x0, by - KSD["br_l"] / 2, bz - 5, x1, by + KSD["br_l"] / 2, bz + 5)
+    for sy in (-1, 1):
+        br = br.cut(cyl("x", (by + sy * KSD["br_hole_sp"] / 2, bz), 1.7, x0 - 1, x1 + 1))
+    tail = KSD["total_h"] - KSD["body_h"] - KSD["br_t"]
+    t0, t1 = sorted((bx - axis_dir * KSD["br_t"], bx - axis_dir * (KSD["br_t"] + tail)))
+    tabs = box(t0, by - 6, bz - 3, t1, by + 6, bz + 3)
+    add(name, cap.union(br).union(tabs), color, kind="buy", note=note)
+    return [(by + sy * KSD["br_hole_sp"] / 2, bz) for sy in (-1, 1)], (x0, x1)
+
+# 순환팬 60mm (칸막이 앞면) + PETG 히터 덕트 + PTC 50W
 fx, fz = FAN_C
 fan_y1 = WALL2_Y0
 fan_y0 = fan_y1 - FAN60["t"]
 fan60 = box(fx - FAN60["s"] / 2, fan_y0, fz - FAN60["s"] / 2, fx + FAN60["s"] / 2, fan_y1, fz + FAN60["s"] / 2).cut(cyl("y", FAN_C, 28.5, fan_y0 - 1, fan_y1 + 1))
 for p in FAN_HOLES:
     fan60 = fan60.cut(cyl("y", p, FAN60["hd"] / 2, fan_y0 - 1, fan_y1 + 1))
-add("H01_fan_60mm_4pin_PWM", fan60, C_BLK, kind="buy")
+add("H01_fan_60mm_4pin_PWM", fan60, C_BLK, kind="buy", note="Evercool EC6025TH12BP")
 hd_y_fl = fan_y0 - 6                           # 덕트 플랜지 6T (팬 앞면, M3 인서트 4)
-H_X0, H_X1 = 22.5, 122.5                      # PTC 하우징 바깥
-H_Z0, H_Z1 = 23, 73
+GAP_PTC = 5                                    # PTC 둘레 틈
+ptc_x0 = 27                                    # PTC 귀 포함 왼쪽 끝
+PTC_Y0 = 165 - PTC["d"] / 2
+PTC_Z0 = FAN_C[1] - PTC["h"] / 2
+H_X0 = ptc_x0 - 2 - 2.5                        # 하우징 바깥 (왼쪽 2mm 여유 + 벽 2.5)
+H_X1 = ptc_x0 + PTC["w"] + 2 + 2.5
+H_Z0 = PTC_Z0 - GAP_PTC - 2.5
+H_Z1 = PTC_Z0 + PTC["h"] + GAP_PTC + 2.5
 H_Y0, H_Y1 = 145, 187
 duct = box(fx - 30, hd_y_fl, fz - 30, fx + 30, fan_y0, fz + 30).cut(cyl("y", FAN_C, 28.5, hd_y_fl - 1, fan_y0 + 1))
 for p in FAN_HOLES:
@@ -692,23 +768,40 @@ trans_in = (cq.Workplane("XZ", origin=(0, hd_y_fl + 0.01, 0)).center(fx, fz).rec
             .workplane(offset=hd_y_fl - H_Y1 + 0.02).center((H_X0 + H_X1) / 2 - fx, (H_Z0 + H_Z1) / 2 - fz).rect(H_X1 - H_X0 - 5, H_Z1 - H_Z0 - 5).loft())
 duct = duct.union(trans.cut(trans_in))
 hous = box(H_X0, H_Y0, H_Z0, H_X1, H_Y1, H_Z1).cut(box(H_X0 + 2.5, H_Y0 - 1, H_Z0 + 2.5, H_X1 - 2.5, H_Y1 + 1, H_Z1 - 2.5))
+# 귀 받침 (PTC 양끝 귀 아래, 열압입 인서트)
+EAR_HOLES = [(ptc_x0 + PTC["ear_len"] / 2, 165), (ptc_x0 + PTC["w"] - PTC["ear_len"] / 2, 165)]
+for ex_ in (ptc_x0, ptc_x0 + PTC["w"] - PTC["ear_len"]):
+    hous = hous.union(box(ex_, 155, H_Z0 + 2.5, ex_ + PTC["ear_len"], 175, PTC_Z0))
+for p in EAR_HOLES:
+    hous = hous.cut(cyl("z", p, 2.0, PTC_Z0 - 5, PTC_Z0 + 1))
+    count("M3 열압입 인서트 (L4)")
 duct = duct.union(hous)
 # 바닥 발 2개 (스탠드오프 15)
 H_FEET = [(35, H_Y0 - 4), (110, H_Y0 - 4)]
 for (x, y_) in H_FEET:
-    ft = box(x - 6, min(y_, H_Y0) - 6 if y_ < H_Y0 else H_Y1, SO_Z + 15, x + 6, H_Y0 if y_ < H_Y0 else y_ + 6, H_Z0 + 2.5)
+    ft = box(x - 6, y_ - 6, SO_Z + 15, x + 6, H_Y0, H_Z0 + 2.5)
     ft = ft.cut(cyl("z", (x, y_), 1.7, SO_Z + 14, H_Z0 + 4))
     duct = duct.union(ft)
+# 95°C 서모스탯: 하우징 오른쪽 벽 구멍으로 캡을 넣어 PTC 핀 끝면에 밀착
+TH95_BASE_X = ptc_x0 + PTC["w"] - PTC["ear_len"] + KSD["body_h"] + 0.1   # 캡 끝 = 핀 블록 끝면 (0.1 띄움)
+duct = duct.cut(cyl("x", (165, FAN_C[1]), KSD["cap_d"] / 2 + 0.5, H_X1 - 3, H_X1 + 1))
+duct = duct.cut(box(TH95_BASE_X - 0.05, 165 - KSD["br_l"] / 2 - 1, FAN_C[1] - 6, H_X1 + 1, 165 + KSD["br_l"] / 2 + 1, FAN_C[1] + 6))  # 브래킷 자리 (벽 1.8 남김)
+th95_holes = [(165 + sy * KSD["br_hole_sp"] / 2, FAN_C[1]) for sy in (-1, 1)]
+for p in th95_holes:
+    duct = duct.cut(cyl("x", p, 1.7, H_X1 - 3, H_X1 + 1))
 add("H02_heater_duct_PETG", duct, C_PETG + (0.85,), "PETG", "3D프린트",
-    note="안쪽 알루미늄 테이프. PTC 둘레 5mm 틈. 오른쪽 주머니 = 95°C 서모스탯")
-ptc_x0 = 30
-ptc = box(ptc_x0, 152, FAN_C[1] - PTC["h"] / 2, ptc_x0 + PTC["w"], 152 + PTC["d"], FAN_C[1] + PTC["h"] / 2)
-add("H03_PTC_fin_12V_80W", ptc, C_HOT, kind="buy", note="[실측] 주문 후 치수 → 덕트 수정")
-# PTC 고정: 하우징 안 바닥/천장 레일 대신 양끝 PETG 받침(덕트 일체) — 모델은 받침만
-for x in (ptc_x0 - 4.5, ptc_x0 + PTC["w"]):
-    add(f"H04_ptc_end_clip_{int(x)}", box(x, 150, H_Z0 + 2.5, x + 4.5, 180, H_Z1 - 2.5), C_PETG, "PETG", "3D프린트")
-th95 = cyl("x", (165, FAN_C[1]), 10, ptc_x0 + PTC["w"] + 4.5, ptc_x0 + PTC["w"] + 4.5 + 13)
-add("H05_thermostat_KSD301_95C", th95, (0.85, 0.1, 0.1), kind="buy", note="PTC 끝단 금속부에 밀착, 클립으로 누름")
+    note="안쪽 알루미늄 테이프. PTC 둘레 5mm 틈. PTC 귀는 받침에 M3, 95°C 서모스탯은 오른쪽 벽")
+fin = box(ptc_x0 + PTC["ear_len"], PTC_Y0, PTC_Z0, ptc_x0 + PTC["w"] - PTC["ear_len"], PTC_Y0 + PTC["d"], PTC_Z0 + PTC["h"])
+for ex_, p in zip((ptc_x0, ptc_x0 + PTC["w"] - PTC["ear_len"]), EAR_HOLES):
+    fin = fin.union(box(ex_, PTC_Y0, PTC_Z0, ex_ + PTC["ear_len"], PTC_Y0 + PTC["d"], PTC_Z0 + PTC["ear_t"])
+                    .cut(cyl("z", p, PTC["ear_hole_d"] / 2, PTC_Z0 - 1, PTC_Z0 + 2)))
+add("H03_PTC_fin_12V_50W", fin, C_HOT, kind="buy", note="디바이스마트 SZH-PTC002 95×31. 귀 모양·구멍은 도착 후 실측")
+for i, p in enumerate(EAR_HOLES):
+    bolt(f"H_ptc_bolt_{i}", "z", p, PTC_Z0 + PTC["ear_t"], -1, 6, spec="M3×6 냄비머리 볼트 (PTC 귀)")
+ksd("H05_thermostat_KSD301_95C", (TH95_BASE_X, 165, FAN_C[1]), -1, note="NC 95°C. 캡이 핀 블록 끝면에 닿게, 브래킷과 벽 사이 와셔로 조정")
+for i, p in enumerate(th95_holes):
+    bolt(f"H_th95_bolt_{i}", "x", p, TH95_BASE_X + KSD["br_t"], -1, 8, spec="M3×8 냄비머리 볼트 (서모스탯)")
+    nut(f"H_th95_nut_{i}", "x", p, H_X1 - 2.5, -1)
 for (x, y_) in H_FEET:
     so(f"H_so_{x}", x, y_, 15)
     bolt(f"H_bolt_{x}", "z", (x, y_), H_Z0 + 2.5, -1, 8, spec="M3×8 냄비머리 볼트 (히터 덕트)")
@@ -726,10 +819,10 @@ for i, (x, y_) in enumerate(OB_HOLES):
     so(f"OB_so_{i}", x, y_, 10)
     bolt(f"OB_bolt_{i}", "z", (x, y_), BAY_Z0 + T05 + 1, -1, 6, spec="M3×6 냄비머리 볼트 (배플)")
 
-# 열 격벽 (Al 1T, 히터 ↔ ESP32)
+# 열 격벽 (Al 1T): 히터 출구 쪽(왼쪽 앞) ↔ ESP32(오른쪽 앞). v2.10: y 40~140, 플랜지 왼쪽
 hb_x = 127
-hb = box(hb_x, 112, BAY_Z0 + T05, hb_x + 1, 212, FLOOR_Z - 6).union(box(hb_x + 1, 112, BAY_Z0 + T05, hb_x + 12, 212, BAY_Z0 + T05 + 1))
-HB_HOLES = [(hb_x + 6.5, 122), (hb_x + 6.5, 202)]
+hb = box(hb_x, 40, BAY_Z0 + T05, hb_x + 1, 140, FLOOR_Z - 6).union(box(hb_x - 11, 40, BAY_Z0 + T05, hb_x, 140, BAY_Z0 + T05 + 1))
+HB_HOLES = [(hb_x - 5.5, 50), (hb_x - 5.5, 130)]
 for p in HB_HOLES:
     hb = hb.cut(cyl("z", p, 1.7, 0, 30))
 add("A13_heat_baffle_Al1T_100x58", hb, C_AL, "알루미늄 1T", "재단+절곡", note="플랜지 11 접기")
@@ -737,14 +830,27 @@ for i, (x, y_) in enumerate(HB_HOLES):
     so(f"HB_so_{i}", x, y_, 10)
     bolt(f"HB_bolt_{i}", "z", (x, y_), BAY_Z0 + T05 + 1, -1, 6, spec="M3×6 냄비머리 볼트 (격벽)")
 
-# DS18B20 (격벽에 케이블타이), 65°C 서모스탯 (플레넘 공기, PETG 받침)
-add("E06_DS18B20_probe", cyl("z", (hb_x + 5, 170), 3, 35, 65), (0.6, 0.6, 0.6), kind="buy")
-th65_base = box(259, 200, SO_Z + 20, 280, 214, SO_Z + 23).union(box(268, 205, SO_Z + 23, 274, 209, SO_Z + 35))
-th65_base = th65_base.cut(cyl("z", (264, 207), 1.7, SO_Z + 19, SO_Z + 24))
-add("E07_thermostat65_stand_PETG", th65_base, C_PETG, "PETG", "3D프린트")
-add("E07_thermostat_KSD301_65C", cyl("z", (271, 207), 10, SO_Z + 35, SO_Z + 48), (0.85, 0.1, 0.1), kind="buy")
-so("E07_so", 264, 207, 20)
-bolt("E07_bolt", "z", (264, 207), SO_Z + 23, -1, 8, spec="M3×8 냄비머리 볼트 (서모스탯 받침)")
+# DS18B20 (배선에 케이블타이, 플레넘 중앙 공기)
+add("E06_DS18B20_probe", cyl("z", (165, 195), 3, 35, 65), (0.6, 0.6, 0.6), kind="buy")
+# 65°C 서모스탯: 플레넘 오른쪽 뒤, 캡이 +x(오른벽 쪽)를 향해 공기 중에
+TH65_C = (222, 47)                              # 캡이 E08 브래킷(z≤38) 위로 지나가게 z 47                              # (y, z)
+th65_bx = IN1 - T05 - 4 - KSD["body_h"]         # 캡 끝이 라이너에서 4mm 떨어지게
+st_x1 = th65_bx - KSD["br_t"] - 0.05
+st = box(st_x1 - 6, TH65_C[0] - 15, SO_TOP, st_x1, TH65_C[0] + 15, TH65_C[1] + 8) \
+    .cut(box(st_x1 - 7, TH65_C[0] - 8, TH65_C[1] - 6, st_x1 + 1, TH65_C[0] + 8, TH65_C[1] + 6))   # 단자 통과창
+st = st.union(box(st_x1 - 16, TH65_C[0] - 7, SO_TOP, st_x1, TH65_C[0] + 7, SO_TOP + 3))
+st_hole = (st_x1 - 11, TH65_C[0])
+st = st.cut(cyl("z", st_hole, 1.7, SO_TOP - 1, SO_TOP + 4))
+th65_holes = [(TH65_C[0] + sy * KSD["br_hole_sp"] / 2, TH65_C[1]) for sy in (-1, 1)]
+for p in th65_holes:
+    st = st.cut(cyl("x", p, 1.7, st_x1 - 7, st_x1 + 1))
+add("E07_thermostat65_stand_PETG", st, C_PETG, "PETG", "3D프린트")
+ksd("E07_thermostat_KSD301_65C", (th65_bx, TH65_C[0], TH65_C[1]), +1, note="NC 65°C, 플레넘 공기")
+for i, p in enumerate(th65_holes):
+    bolt(f"E07_th_bolt_{i}", "x", p, th65_bx, -1, 10, spec="M3×10 냄비머리 볼트 (서모스탯)")
+    nut(f"E07_th_nut_{i}", "x", p, st_x1 - 6, -1)
+so("E07_so", st_hole[0], st_hole[1], 20)
+bolt("E07_bolt", "z", st_hole, SO_TOP + 3, -1, 8, spec="M3×8 냄비머리 볼트 (서모스탯 받침)")
 
 # 칸막이 고정 L브래킷 2 (PETG)
 for x in (25, 275):
@@ -754,20 +860,26 @@ for x in (25, 275):
     so(f"E08_so_{x}", x, WALL2_Y0 - 8, 10)
     bolt(f"E08_bolt_{x}", "z", (x, WALL2_Y0 - 8), SO_Z + 13.5, -1, 6, spec="M3×6 냄비머리 볼트 (칸막이 브래킷)")
 
-# 뒷판 부착물 (복귀실 안쪽): DC잭 2, 마이크로USB, 로커 스위치
-for i, p in enumerate(DCJ):
-    add(f"E09_DC_jack_{i+1}", cyl("y", p, 4, OUT - 18, OUT).union(cyl("y", p, 6, OUT, OUT + 2)), C_BLK, kind="buy")
-usb = box(USB_C[0] - 18, OUT - 30, USB_C[1] - 4, USB_C[0] + 18, OUT - WALL, USB_C[1] + 4)
-usb = usb.cut(box(USB_C[0] - 18, OUT - 30, USB_C[1] - 4, USB_C[0] - 7, OUT - 8, USB_C[1] + 4)) \
-    .cut(box(USB_C[0] + 7, OUT - 30, USB_C[1] - 4, USB_C[0] + 18, OUT - 8, USB_C[1] + 4))
+# 뒷판 부착물 (복귀실 안쪽): 전원 케이블 글랜드, 마이크로USB, 로커 스위치
+gl = cyl("y", GLAND_C, 6.0, OUT - WALL - 6, OUT + 3)                                   # 나사부
+gl = gl.union(hexprism((0, 0), 19, 0, 3).rotate((0, 0, 0), (1, 0, 0), -90).translate((GLAND_C[0], OUT, GLAND_C[1])))
+gl = gl.union(cyl("y", GLAND_C, 7.5, OUT + 3, OUT + 15))                              # 돔 캡
+gl = gl.union(cyl("y", GLAND_C, PWR["nut_od"] / 2, OUT - WALL - 5, OUT - WALL))         # 안쪽 너트
+gl = gl.cut(cyl("y", GLAND_C, 2.6, OUT - WALL - 7, OUT + 16))
+add("E09_cable_gland_PG7", gl, C_BLK, kind="buy", note="어댑터 플러그를 잘라 케이블만 통과, 안에서 퓨즈홀더→WAGO")
+add("E09_adapter_cable", cyl("y", GLAND_C, 2.5, OUT - WALL - 25, OUT + 40), (0.1, 0.1, 0.1), kind="buy")
+usb = box(USB_C[0] - 12.85, OUT - WALL - 2, USB_C[1] - 4.9, USB_C[0] + 12.85, OUT - WALL, USB_C[1] + 4.9)     # 귀 판 25.7×9.8
 for p in USB_HOLES:
-    usb = usb.cut(cyl("y", p, 1.7, OUT - 30, OUT))
-add("E09_microUSB_panel_mount", usb, C_BLK, kind="buy", note="[실측] 귀 구멍 간격")
+    usb = usb.cut(cyl("y", p, 1.5, OUT - WALL - 3, OUT))
+usb = usb.union(box(USB_C[0] - 5, OUT - WALL - 29.8, USB_C[1] - 4, USB_C[0] + 5, OUT - WALL - 2, USB_C[1] + 4))
+usb = usb.union(box(USB_C[0] - 4.5, OUT - WALL, USB_C[1] - 2.3, USB_C[0] + 4.5, OUT - WALL + 1.0, USB_C[1] + 2.3))
+add("E09_microUSB_panel_mount_ada3258", usb, C_BLK, kind="buy", note="Adafruit 3258 STEP 기준 외형")
 for i, p in enumerate(USB_HOLES):
     bolt(f"E09_usb_bolt_{i}", "y", p, OUT, -1, 12, spec="M3×12 냄비머리 볼트 (USB)")
-    nut(f"E09_usb_nut_{i}", "y", p, OUT - 8, -1)
-add("E09_rocker_switch_KCD1", box(SW_C[0] - 9.5, OUT - 22, SW_C[1] - 6.4, SW_C[0] + 9.5, OUT - WALL, SW_C[1] + 6.4)
-    .union(box(SW_C[0] - 10.5, OUT, SW_C[1] - 7.5, SW_C[0] + 10.5, OUT + 2, SW_C[1] + 7.5)), C_BLK, kind="buy")
+    nut(f"E09_usb_nut_{i}", "y", p, OUT - WALL - 2, -1)
+add("E09_rocker_switch_KCD1", box(SW_C[0] - 9.5, OUT - 22, SW_C[1] - 6.4, SW_C[0] + 9.5, OUT - 1, SW_C[1] + 6.4)
+    .union(box(SW_C[0] - 10.5, OUT, SW_C[1] - 7.5, SW_C[0] + 10.5, OUT + 2, SW_C[1] + 7.5)), C_BLK, kind="buy",
+    note="뒷판 안쪽 카운터보어로 판 1mm만 남겨 스냅 고정")
 
 # 바닥판·바닥폼·라이너에 스탠드오프 구멍
 for (x, y_, L) in SO_HOLES:

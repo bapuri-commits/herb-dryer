@@ -13,18 +13,21 @@
 # 키 이름은 CAD 스크립트 안의 변수 이름과 같다 (예: PTC.w → PTC["w"]).
 # ============================================================
 
-PTC:   # PTC 80W 핀 발열체 → H02 히터 덕트, H03, H04
+PTC:   # PTC 12V 50W 핀 발열체 (디바이스마트 SZH-PTC002) → H02 히터 덕트, H03, H04 귀 받침
   bom: 8
-  w: {value: 70, status: 가정, source: "v2.9 초기값 (x폭). 주문 후 실측"}
-  d: {value: 26, status: 가정, source: "v2.9 초기값 (y, 공기 방향 두께)"}
-  h: {value: 35, status: 가정, source: "v2.9 초기값 (z높이)"}
+  w:          {value: 95,  status: 판매처 표기, source: "https://www.devicemart.co.kr/goods/view?no=14075260 '95x31' (귀 포함 전체 길이로 가정)"}
+  h:          {value: 31,  status: 판매처 표기, source: "SZH-PTC002 '95x31'"}
+  d:          {value: 25,  status: 가정, source: "같은 형식 54B2 '92×31×25' (알리 1005009279284775) 기준 공기 방향 두께"}
+  ear_len:    {value: 8,   status: 가정, source: "양끝 귀(장착 판) 길이. 도착 후 실측"}
+  ear_t:      {value: 1.0, status: 가정, source: "귀 판 두께"}
+  ear_hole_d: {value: 3.5, status: 가정, source: "귀 구멍 지름 (M3 통과 가정)"}
 
-EXP:   # ESP32 38핀 확장보드 → 스탠드오프 4개 위치 (E01)
+EXP:   # ESP32 확장보드 CMODULE-47 (디바이스마트 15315957) → 스탠드오프 4개 위치 (E01)
   bom: 21
-  w:     {value: 78,  status: 가정, source: "판매처마다 68~78. 큰 쪽 가정"}
-  d:     {value: 63,  status: 가정, source: "판매처마다 53~63. 큰 쪽 가정"}
-  t:     {value: 1.6, status: 가정, source: "일반 PCB 두께"}
-  inset: {value: 3.5, status: 가정, source: "구멍 중심이 모서리에서 3.5 안쪽 가정"}
+  w:     {value: 78,   status: 판매처 표기, source: "디바이스마트 15315957 '78mm x 52.5mm'"}
+  d:     {value: 52.5, status: 판매처 표기, source: "디바이스마트 15315957 '78mm x 52.5mm'"}
+  t:     {value: 1.6,  status: 가정, source: "일반 PCB 두께"}
+  inset: {value: 3.5,  status: 가정, source: "모서리 구멍 4개(사진), 위치 미표기 → 도착 후 실측"}
 
 LC:    # 1kg 바형 로드셀 → L01·L03 블록, 타공판 구멍, M4 볼트
   bom: 5
@@ -44,19 +47,19 @@ LCD:   # LCD1602 + I2C 백팩 (키트 보유) → 앞판 창·구멍 (E10)
   bez_h: {value: 24, status: 가정, source: "베젤 가정"}
   bez_t: {value: 7,  status: 가정, source: "베젤 두께 가정"}
 
-FAN60: # 60mm 순환팬 → 칸막이 P04 구멍, 히터 덕트 플랜지
+FAN60: # 60mm 순환팬 Evercool EC6025TH12BP PWM → 칸막이 P04 구멍, 히터 덕트 플랜지
   bom: 9
-  s:    {value: 60,  status: 판매처 표기, source: "60×60×25 표준 규격"}
-  t:    {value: 25,  status: 판매처 표기, source: "60×60×25 표준 규격"}
-  hole: {value: 50,  status: 판매처 표기, source: "60mm 팬 표준 구멍 간격"}
-  hd:   {value: 4.3, status: 가정, source: "팬 구멍 지름 가정"}
+  s:    {value: 60,  status: 판매처 표기, source: "Evercool 6025 도면 60±0.5 (BOM v2.9.3 상품확정 시트)"}
+  t:    {value: 25,  status: 판매처 표기, source: "도면 25.2±0.5. 덕트 플랜지·칸막이 사이에 끼우므로 25 유지, 볼트 길이 여유로 흡수"}
+  hole: {value: 50,  status: 판매처 표기, source: "도면 50±0.3"}
+  hd:   {value: 4.4, status: 판매처 표기, source: "도면 8-Ø4.4±0.3"}
 
-FAN40: # 40mm 흡기팬 → 흡기 박스 I01, 앞판 구멍
+FAN40: # 40mm 흡기팬 Evercool EC4010TH12BP PWM → 흡기 박스 I01, 앞판 구멍
   bom: 10
-  s:    {value: 40,  status: 판매처 표기, source: "https://www.icbanq.com/P005700974"}
-  t:    {value: 10,  status: 판매처 표기, source: "40×40×10 (NF-A4x10 / FC4040B)"}
-  hole: {value: 32,  status: 판매처 표기, source: "40mm 팬 표준 구멍 간격"}
-  hd:   {value: 3.4, status: 가정, source: "팬 구멍 지름 가정"}
+  s:    {value: 40,   status: 판매처 표기, source: "https://www.icbanq.com/P016851891"}
+  t:    {value: 10.4, status: 판매처 표기, source: "Evercool 4010 도면 10.4±0.5"}
+  hole: {value: 32,   status: 판매처 표기, source: "도면 32±0.3"}
+  hd:   {value: 3.5,  status: 판매처 표기, source: "도면 4-Ø3.5±0.3"}
 
 HINGE: # 25mm 소형 맞대기 경첩 → 앞판·문 구멍 (D06)
   bom: 35
@@ -67,32 +70,70 @@ HINGE: # 25mm 소형 맞대기 경첩 → 앞판·문 구멍 (D06)
   hole_off: {value: 10.5, status: 가정, source: "핀 중심 → 구멍 중심 거리 가정"}
   hole_sp:  {value: 12.5, status: 가정, source: "구멍 간격 가정"}
 
-MOD:   # 캐리어 판 위 소형 모듈 [가로, 세로, 높이] → E03 캐리어 포켓
+MOD:   # 캐리어 판 위 소형 모듈 [가로(x), 세로(y), 높이] → E03 캐리어 포켓
   bom: "22, 6, 11, 17, 15"
-  SD:      {value: [42, 24, 8],  status: 가정, source: "마이크로SD 모듈 일반 크기 (BOM 22)"}
+  SD:      {value: [42, 24, 8],  status: 가정, source: "SZH-EKBZ-005 치수 미표기 (BOM 22)"}
   HX711:   {value: [34, 20, 6],  status: 가정, source: "HX711 일반 크기 (BOM 6, 구매완료 11/7)"}
-  D4184_1: {value: [23, 16, 12], status: 가정, source: "D4184 모듈 일반 크기 (BOM 11)"}
-  D4184_2: {value: [23, 16, 12], status: 가정, source: "D4184 모듈 일반 크기 (BOM 11)"}
-  MP1584:  {value: [22, 17, 5],  status: 가정, source: "판매처 표기 22×17×4 (https://www.icbanq.com/P008113809), 높이는 부품 포함 5 가정"}
-  BUZZER:  {value: [12, 12, 9],  status: 가정, source: "12mm 패시브 부저 (BOM 15)"}
+  MOS_1:   {value: [44, 32, 14], status: 판매처 표기, source: "DFRobot DFR0457 치수도면 44×32 (높이는 가정)"}
+  MOS_2:   {value: [44, 32, 14], status: 판매처 표기, source: "DFRobot DFR0457 치수도면 44×32 (높이는 가정)"}
+  MP1584:  {value: [22, 17, 5],  status: 판매처 표기, source: "https://www.icbanq.com/P008113809 22×17×4, 높이는 부품 포함 5"}
+  BUZZER:  {value: [33, 13, 12], status: 판매처 표기, source: "디바이스마트 1326922 '33×13mm' (높이 가정)"}
 
-USB:   # 마이크로USB 패널마운트 → 뒷판 귀 구멍 (E09)
+MOS:   # DFR0457 장착 구멍 (모듈 오른쪽·위·아래 변 기준) → 캐리어 볼트
+  bom: 11
+  hole_d:    {value: 3.1, status: 판매처 표기, source: "DFRobot 위키 Ø3.1"}
+  hole_sp_x: {value: 20,  status: 판매처 표기, source: "DFR0457 치수도면 20"}
+  hole_sp_y: {value: 25,  status: 판매처 표기, source: "DFR0457 치수도면 25"}
+  hole_edge: {value: 3.5, status: 판매처 표기, source: "오른쪽·위·아래 변에서 3.5"}
+
+USB:   # 마이크로USB 패널마운트 Adafruit 3258 → 뒷판 (E09)
   bom: 23
-  hole_sp: {value: 28, status: 가정, source: "귀 구멍 간격 28 가정"}
+  hole_sp: {value: 17.0, status: 판매처 표기, source: "Adafruit_CAD_Parts 3258 STEP 원통면 Ø3.0 @x=±8.5 (표기 17.3)"}
+  cut_w:   {value: 9.4,  status: 판매처 표기, source: "리셉터클 9.0×4.6 + 0.4"}
+  cut_h:   {value: 5.0,  status: 판매처 표기, source: "리셉터클 9.0×4.6 + 0.4"}
+  plug_w:  {value: 13,   status: 가정, source: "앞면 포켓: 마이크로B 플러그 몰딩 약 11×7 + 여유"}
+  plug_h:  {value: 9,    status: 가정, source: "앞면 포켓"}
 
-DCJ:   # DC잭 5.5×2.1 패널형 ×2 → 뒷판 구멍 (E09)
+PWR:   # 전원 인입: 어댑터 플러그를 잘라 PG7 케이블 글랜드로 넣고 안에서 WAGO에 직결 (패널 DC잭 삭제)
   bom: 18
-  hole_d: {value: 8.2, status: 가정, source: "DC-022 M8 나사 가정 → Ø8.2"}
+  gland_d:  {value: 12.5, status: 가정, source: "PG7 케이블 글랜드 표준 장착 구멍 12.5 (케이블 Ø3~6.5)"}
+  nut_od:   {value: 22,   status: 가정, source: "PG7 안쪽 너트 외경 (폼 포켓 크기)"}
 
-TB:    # 12V 분배 터미널블록 12P → 스탠드오프 2개 위치 (E05)
+WAGO:  # 12V 분배 WAGO 221-415 ×4 → E05 WAGO 홀더 (12P 터미널블록 대체)
   bom: 24
-  w:       {value: 116, status: 가정, source: "배리어형 116×20 가정"}
-  d:       {value: 20,  status: 가정, source: "배리어형 116×20 가정"}
-  h:       {value: 17,  status: 가정, source: "높이 가정"}
-  hole_sp: {value: 108, status: 가정, source: "구멍 간격 108 가정"}
+  w: {value: 8.4,  status: 판매처 표기, source: "WAGO 221-415 데이터시트 30×8.4×18.6"}
+  d: {value: 30,   status: 판매처 표기, source: "WAGO 221-415"}
+  h: {value: 18.6, status: 판매처 표기, source: "WAGO 221-415"}
+  n: {value: 4,    status: 판매처 표기, source: "12V 2개, GND 2개"}
 
 TCS:   # TCS34725 (DFRobot SEN0212) → 천장 센서 인서트 S01 포켓 안 보드
   bom: 1
-  w: {value: 22,  status: 가정, source: "보드 외형 22×22 가정"}
-  d: {value: 22,  status: 가정, source: "보드 외형 22×22 가정"}
-  t: {value: 1.6, status: 가정, source: "PCB 두께"}
+  w: {value: 18.51, status: 판매처 표기, source: "DFRobot SEN0212 레이아웃 V1.0 18.51×23.00"}
+  d: {value: 23.0,  status: 판매처 표기, source: "DFRobot SEN0212 레이아웃 V1.0"}
+  t: {value: 1.6,   status: 가정, source: "PCB 두께"}
+
+SHT:   # SHT31 (DFRobot SEN0331) → 왼벽 홀더 C01
+  bom: 2
+  w:         {value: 19,  status: 판매처 표기, source: "SEN0331 치수도면 V1.0 19.00"}
+  h:         {value: 16,  status: 판매처 표기, source: "SEN0331 치수도면 16.00"}
+  t:         {value: 1.0, status: 판매처 표기, source: "SEN0331 치수도면 1.0t"}
+  hole_d:    {value: 2.0, status: 판매처 표기, source: "DFRobot 위키 Ø2"}
+  hole_sp:   {value: 15,  status: 판매처 표기, source: "SEN0331 치수도면 15.00"}
+  hole_edge: {value: 2.0, status: 가정, source: "도면 축척 측정 약 2.0"}
+
+BME:   # BME688 (DFRobot SEN0617) → C03 홀더 포켓, 흡기 박스 슬롯
+  bom: "3, 4"
+  w: {value: 30,  status: 판매처 표기, source: "wiki.dfrobot.com/sen0617 30×22"}
+  h: {value: 22,  status: 판매처 표기, source: "SEN0617 30×22"}
+  t: {value: 1.6, status: 판매처 표기, source: "SEN0617 레이아웃 PCB 1.6"}
+
+KSD:   # 서모스탯 KSD301 (Xucheng 승인서 KSD301-060 p.5 외형도, 동계열) → H05·E07
+  bom: "13, 14"
+  cap_d:     {value: 16,   status: 판매처 표기, source: "XC 승인서 캡 Ø16±0.2"}
+  body_h:    {value: 11.8, status: 판매처 표기, source: "XC 승인서 몸체 높이 11.8±0.5"}
+  total_h:   {value: 33.6, status: 판매처 표기, source: "XC 승인서 탭 포함 33.6±1"}
+  br_l:      {value: 32,   status: 판매처 표기, source: "브래킷 길이 32±1"}
+  br_hole_sp: {value: 24,  status: 판매처 표기, source: "브래킷 구멍 간격 24±0.5"}
+  br_t:      {value: 0.8,  status: 판매처 표기, source: "브래킷 두께 0.8"}
+  lead_len:  {value: 25,   status: 가정, source: "탭에 꽂는 압착 완료 패스턴 리드선 단자 길이 + 굽힘 여유"}
+

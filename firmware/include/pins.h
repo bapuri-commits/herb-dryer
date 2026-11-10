@@ -2,7 +2,7 @@
 // 바꿀 때는 docs/pinmap.md, BOM 시트, 이 파일 세 곳을 같은 PR에서 함께 바꾼다.
 #pragma once
 
-// ---- I2C: TCS34725 0x29, SHT31 0x44, BME688 #1 0x77(배기), BME688 #2 0x76(흡기), LCD 0x27
+// ---- I2C: TCS34725 0x29, SHT31 0x44, BME688 #1 0x77(배기), BME688 #2 0x76(흡기, P2 헤더 SDO→GND, 안 되면 TCA9548A), LCD 0x27
 constexpr int PIN_I2C_SDA = 21;
 constexpr int PIN_I2C_SCL = 22;
 
@@ -11,10 +11,11 @@ constexpr int PIN_HX711_DT  = 16;
 constexpr int PIN_HX711_SCK = 17;
 
 // ---- 출력
-constexpr int PIN_HEATER_PWM   = 25;  // D4184 #1 → PTC 80W (LEDC 1kHz)
+constexpr int PIN_HEATER_PWM   = 25;  // DFR0457 #1 → PTC 50W (LEDC 1kHz, 켤 때 2~3초 소프트 스타트)
 constexpr int PIN_FAN_CIRC_PWM = 26;  // 60mm 순환팬 4핀 PWM (운전 중 60~100%)
-constexpr int PIN_FAN_IN_PWM   = 27;  // 40mm 흡기팬 PWM = 환기량 = 습도 조절
-constexpr int PIN_LED          = 32;  // D4184 #2 → LED 스트립 ON/OFF
+constexpr int PIN_FAN_IN_PWM   = 27;  // 40mm 흡기팬 PWM = 환기량 = 습도 조절. 최대 30% (50W 히터 열수지)
+constexpr int FAN_IN_MAX_DUTY_PCT = 30;
+constexpr int PIN_LED          = 32;  // DFR0457 #2 → LED 스트립 ON/OFF
 constexpr int PIN_BUZZER       = 33;  // 패시브 부저
 
 // ---- DS18B20 OneWire (플레넘. 2차 냉각핀 2개도 같은 버스)
