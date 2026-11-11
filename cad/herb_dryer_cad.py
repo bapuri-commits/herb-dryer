@@ -913,13 +913,48 @@ add("X_P2_XL4016_buck", box(214, 200 - 0, SO_TOP + 3, 252, 200 + 0.1, SO_TOP + 4
 # ============================================================
 # 13. 저장
 # ============================================================
+# Fusion 브라우저에서 폴더(하위 컴포넌트)로 보이도록 STEP을 2단 어셈블리로 저장한다.
+# 그룹 이름은 STEP 호환을 위해 영문 + 번호(정렬용). 한글 설명은 docs/naming.md.
+GROUPS = [   # (그룹, 이 접두어로 시작하는 부품) — 위에서부터 먼저 맞는 것
+    ("01_shell_foamex",        ("P01", "P02", "P03", "P06", "P07", "B0")),
+    ("02_insulation_foam",     ("F0",)),
+    ("03_liner_Al",            ("A01", "A02", "A03", "A04", "A05", "A06", "A07")),
+    ("04_partition_floor",     ("P04", "P05", "A10", "A12", "A13")),
+    ("05_door",                ("D0",)),
+    ("06_heater",              ("H0",)),
+    ("07_intake",              ("I0",)),
+    ("08_electronics",         ("E",)),
+    ("09_loadcell_tray",       ("L0", "A11", "T0")),
+    ("10_sensors_ceiling",     ("S0",)),
+    ("11_sensors_chamber",     ("C0",)),
+]
+FASTENER_GROUP = "90_fasteners"
+P2_GROUP = "99_phase2_peltier"
+
+def group_of(p):
+    if p["phase"] == 2:
+        return P2_GROUP
+    if p["kind"] == "fastener":
+        return FASTENER_GROUP
+    for g, prefixes in GROUPS:
+        if p["name"].startswith(prefixes):
+            return g
+    return "98_other"
+
 def build_assembly(include_p2=True):
     asm = cq.Assembly(name="herb_dryer")
+    subs = {}
+    order = [g for g, _ in GROUPS] + ["98_other", FASTENER_GROUP, P2_GROUP]
+    for g in order:
+        subs[g] = cq.Assembly(name=g)
     for p in PARTS:
         if p["phase"] == 2 and not include_p2:
             continue
         col = p["color"]
-        asm.add(p["shape"], name=p["name"], color=cq.Color(*col) if len(col) == 4 else cq.Color(*col, 1.0))
+        subs[group_of(p)].add(p["shape"], name=p["name"], color=cq.Color(*col) if len(col) == 4 else cq.Color(*col, 1.0))
+    for g in order:
+        if subs[g].children:
+            asm.add(subs[g], name=g)
     return asm
 
 REPO = Path(__file__).resolve().parent.parent

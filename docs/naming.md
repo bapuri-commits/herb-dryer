@@ -20,6 +20,30 @@ STEP·도면·STL·이슈에서 부품을 부를 때 이 이름을 쓴다. Fusio
 | **C** | 챔버 센서 (SHT31·BME688 #1 홀더, 케이블 클립) | `C01_SHT31_holder_PETG_5mm`, `C05_cable_clip_1` |
 | **X_P2** | 2차 (펠티어, `phase=2`, 참조용) | `X_P2_TEC1-12706_1`, `X_P2_fan_120mm` |
 
+## Fusion 브라우저 폴더 (STEP 어셈블리 그룹)
+
+STEP은 아래 그룹 안에 부품이 들어간 2단 구조로 저장된다 (`cad/herb_dryer_cad.py`의 `GROUPS`).
+Fusion에서 열면 그룹이 하위 컴포넌트(폴더처럼 접히는 항목)로 보인다. 그룹 이름은 STEP 호환을 위해 영문이다.
+
+| 그룹 | 들어가는 부품 | 담당 |
+|---|---|---|
+| `01_shell_foamex` | P01·P02·P03·P06·P07 외판, B 블록 | 외함 |
+| `02_insulation_foam` | F 단열 폼, 펠티어 막음 폼 | 외함 |
+| `03_liner_Al` | A01~A07 라이너 | 외함 |
+| `04_partition_floor` | P04 칸막이 벽, P05 받침 턱, A10 타공판, A12·A13 배플 | 외함 |
+| `05_door` | D 문 | 외함 |
+| `06_heater` | H 순환팬·덕트·PTC·서모스탯 | 전장 |
+| `07_intake` | I 흡기 박스 | 기구·전장 |
+| `08_electronics` | E 전장 전부 | 전장 |
+| `09_loadcell_tray` | L 로드셀, A11 차폐판, T 트레이 | 기구 |
+| `10_sensors_ceiling` | S 천장 센서 인서트·플랩 | 기구 |
+| `11_sensors_chamber` | C 챔버 센서 홀더·클립 | 기구 |
+| `90_fasteners` | 모든 볼트·너트·스탠드오프·스페이서 | — |
+| `99_phase2_peltier` | 2차 부품 (`phase=2`) | — |
+
+- 새 부품의 그룹은 접두어로 자동으로 정해진다. 새 접두어를 만들면 `GROUPS`에 한 줄 추가한다.
+- 체결부품을 한 그룹에 모아 둔 이유: Fusion에서 `90_fasteners`의 눈 아이콘 하나로 볼트를 전부 숨기려고.
+
 ## 체결부품 이름
 
 볼트·너트·스탠드오프는 붙는 부품의 접두어 뒤에 `_bolt_`, `_nut_`, `_so_`를 붙인다
