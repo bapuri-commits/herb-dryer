@@ -65,7 +65,7 @@ def run(cad_module, outdir=".", which="all", version=""):
     load_meshes(cad_module)
     tag=f"{version} " if version else ""
     if which in ("all","ext"):
-        shot("r1_exterior.png", lambda n,p: True, iso, f"{tag}exterior (front door closed, phase2 transparent)")
+        shot("r1_exterior.png", lambda n,p: True, iso, f"{tag}exterior (front door closed)")
         shot("r2_cutaway.png", cut, [(-380,-420,330),(150,150,110),(0,0,1)], f"{tag}cutaway: front/left/top removed")
         shot("r3_bay_top.png", bay, [(150,150,700),(150,150,0),(0,1,0)], f"{tag}bay plan view (z<81, liners/foam hidden)", parallel=True, zoom=1.3)
         shot("r4_bay_iso.png", bay, [(-200,-250,320),(150,140,40),(0,0,1)], f"{tag}bay iso")
