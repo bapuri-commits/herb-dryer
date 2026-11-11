@@ -13,14 +13,15 @@ STEP·도면·STL·이슈에서 부품을 부를 때 이 이름을 쓴다. Fusio
 | **D** | 문 (바깥판, 플러그, 가스켓, 자석, 경첩, 손잡이) | `D01_door_outer_foamex5T`, `D07_door_pull_handle_96` |
 | **E** | 전장 (측면 박스 안: ESP32, 모듈, WAGO, LCD, 버튼, 퓨즈) | `E01_ESP32_38pin_expansion_board`, `E04_MOS_3_DFR0457`, `E12_inline_fuse_holder` |
 | **H** | 히터 (60mm 순환팬, 알루미늄 덕트, PTC, 서모스탯) | `H06_heater_duct_Al05`, `H07_ear_baffle_R_Al`, `H08_duct_saddle_1_Al` |
-| **I** | 흡기 (뒷판 흡기 박스, 40mm 팬, 활성탄, BME688 #2) | `I01_intake_box_PETG`, `I02_fan_40mm_intake_PWM` |
-| **K** | 측면 전장 박스 (포맥스 판, 코너 블록, 벽 관통 글랜드) | `K01_sidebox_front_foamex5T`, `K06_sidebox_mount_plate_foamex5T`, `K20_gland_PG7_chamber` |
+| **I** | 흡기 (뒷판 흡기 박스, 40mm 팬, 바깥 활성탄 커버, BME688 #2) | `I01_intake_box_PETG`, `I06_intake_carbon_cover_PETG` |
+| **K** | 측면 전장 박스 (포맥스 판, 코너 블록, 벽 관통 글랜드) | `K01_sidebox_front_foamex5T`, `K06_sidebox_mount_plate_foamex5T`, `K20_gland_PG9_bay_power` |
 | **L** | 로드셀 (블록, 로드셀, 받침판) | `L01_loadcell_base_block`, `L02_loadcell_1kg_bar` |
 | **T** | 트레이 (알루미늄 앵글 프레임, 가운데 판, 스테인리스 메시) | `T03_tray_frame_Al_angle`, `T02_tray_mesh_SS` |
-| **S** | 천장 센서 (센서 인서트, TCS34725, LED, 배기 플랩) | `S01_sensor_insert_PETG_100x100`, `S05_exhaust_flap_PET0.3` |
+| **S** | 천장 배기 플랩 | `S04_exhaust_flap_frame_PETG`, `S05_exhaust_flap_PET0.3` |
 | **C** | 챔버 센서 (오른벽 SHT31·BME688 #1 홀더) | `C01_SHT31_holder_PETG`, `C03_BME688_1_holder_PETG` |
 
 v3.0에서 지운 번호(다시 쓰지 않음): A05, A13, P04, P05, F05, H02, H04, T01, E08, C05, X_P2_*
+v3.1에서 지운 번호: S01, S02, S03, K21, E04_MOS_2, E04_BUZZER
 
 ## Fusion 브라우저 폴더 (STEP 어셈블리 그룹)
 
@@ -38,7 +39,7 @@ Fusion에서 열면 그룹이 하위 컴포넌트(폴더처럼 접히는 항목)
 | `07_intake` | I 흡기 박스 | 기구·전장 |
 | `08_electronics` | E 전장 전부 (측면 박스 안) | 전장 |
 | `09_loadcell_tray` | L 로드셀, A11 차폐판, T 트레이 | 기구 |
-| `10_sensors_ceiling` | S 천장 센서 인서트·플랩 | 기구 |
+| `10_exhaust_ceiling` | S 천장 배기 플랩 | 기구 |
 | `11_sensors_chamber` | C 챔버 센서 홀더 | 기구 |
 | `12_side_box` | K 측면 박스 판·코너 블록·벽 관통 글랜드 | 전장·기구 |
 | `90_fasteners` | 모든 볼트·너트·스탠드오프·스페이서 | — |

@@ -1,9 +1,11 @@
 """
-허브 건조기 v3.0 — 제작용 CadQuery 모델 (버전별 변경은 CHANGELOG.md)
+허브 건조기 v3.1 — 제작용 CadQuery 모델 (버전별 변경은 CHANGELOG.md)
 좌표: X=폭(좌→우), Y=깊이(앞=0 → 뒤=300), Z=높이(바닥=0). 단위 mm.
 
 v3.0 (메이저): 회로를 본체 오른쪽 측면 박스(K)로 분리, 공기 경로는 알루미늄·스테인리스·팬·PTC·센서만.
 펠티어(2차) 완전 제외, 덕트 깊이 20, 칸막이·덕트 벽·히터 덕트 알루미늄화, 흡기를 뒷판(복귀실)으로.
+v3.1: TCS34725·LED·천장 센서 인서트·부저 삭제, 전장부 관통구를 PG9 전력/신호 2개로 분리,
+흡기: 활성탄을 뒷판 바깥 커버(차가운 쪽)로, BME688 #2를 관 옆벽 홈(흐름과 나란히), 출구-칸막이 20mm.
 
 v2.8 → v2.9 주요 변경
 - 순환 구조: 덕트 벽을 전장부 바닥까지 내려 '플레넘(앞)'과 '복귀실(뒤)'로 분리.
@@ -203,10 +205,14 @@ SB_X0, SB_X1 = OUT, OUT + 95                   # 측면 박스 (본체 오른쪽
 BP_X0, BP_X1 = OUT, OUT + WALL                 # 측면 박스 세로 장착판 (본체 옆판 바깥면에 접착)
 
 # 오른쪽 옆판 관통구 (y, z) — 본체 ↔ 측면 박스
-PT1 = (30, 45)            # 전장부: 히터·팬 2·DS18B20·로드셀·BME688 #2 (PG7)
-PT2 = (CH_CY, 257)        # 천장: TCS·LED (Ø8 그로밋, 천장 폼 높이 링 공간)
+PT1P = (22, 33)           # 전장부 전력: PTC 2, 팬 전원 4 (PG9)
+PT1S = (42, 57)           # 전장부 신호: 팬 PWM·타코 4, DS18B20 3, 로드셀 4, BME688 #2 4 (PG9)
+PG9 = dict(d=15.5, nut_od=24.0)          # PG9 글랜드: 장착 구멍, 너트 외경 [가정]
 PT3 = (215, 237)          # 전실: BME688 #1 (PG7)
 PT4 = (165, 170)          # 챔버: SHT31 (PG7)
+PTS = (PT1P, PT1S, PT3, PT4)
+def gl_d(p): return PG9["d"] if p in (PT1P, PT1S) else PWR["gland_d"]
+def gl_nut(p): return PG9["nut_od"] if p in (PT1P, PT1S) else PWR["nut_od"]
 SHT_P = (CH_CY, 170)      # SHT31 홀더 관통 볼트 (오른벽)
 BME1_P = (250, 237)       # BME688 #1 홀더 관통 볼트 (오른벽, 덕트 위 전실)
 LC_TOP = FLOOR_TOP + 15 + PARAMS["LC"]["s"] + 20 + 1 + 4    # 트레이 받침판 윗면 (로드셀 블록·차폐판 포함)
@@ -226,15 +232,14 @@ def side_wall(x0, right):
     for z in DUCTANG_Z:
         w = w.cut(cyl("x", (DUCTANG_Y, z), 1.7, x0 - 1, x0 + WALL + 1))
     if right:
-        for p in (PT1, PT3, PT4):
-            w = w.cut(cyl("x", p, PWR["gland_d"] / 2, x0 - 1, x0 + WALL + 1))
-        w = w.cut(cyl("x", PT2, 4, x0 - 1, x0 + WALL + 1))
+        for p in PTS:
+            w = w.cut(cyl("x", p, gl_d(p) / 2, x0 - 1, x0 + WALL + 1))
         for p in (SHT_P, BME1_P):
             w = w.cut(cyl("x", p, 1.7, x0 - 1, x0 + WALL + 1))
     return w
 side_L = add("P01_side_L_foamex5T", side_wall(0, False), C_FOAMEX, "포맥스 5T", "재단")
 side_R = add("P01_side_R_foamex5T", side_wall(OUT - WALL, True), C_FOAMEX, "포맥스 5T", "재단",
-             note="관통구 4(측면 박스), 센서 홀더 볼트 2")
+             note="관통구 4(PG9 2 + PG7 2, 측면 박스), 센서 홀더 볼트 2")
 
 # 앞판: 290 × 265 — v3.0: 문 개구부·경첩·자석만 (흡기·LCD·버튼 없음)
 front = box(WALL, 0, 0, OUT - WALL, WALL, WALL_H)
@@ -258,7 +263,8 @@ back = box(WALL, OUT - WALL, 0, OUT - WALL, OUT, WALL_H)
 INTAKE_C = (220, 45)                                # 흡기팬 중심 (x, z), 복귀실 높이
 back = back.cut(cyl("y", INTAKE_C, 19, OUT - WALL - 1, OUT + 1))
 INTAKE_HOLES = [(INTAKE_C[0] + sx * FAN40["hole"] / 2, INTAKE_C[1] + sz * FAN40["hole"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
-for p in INTAKE_HOLES:
+COVER_PTS = [(INTAKE_C[0] - 25, INTAKE_C[1] + 25), (INTAKE_C[0] + 25, INTAKE_C[1] - 25)]   # 활성탄 커버 볼트
+for p in INTAKE_HOLES + COVER_PTS:
     back = back.cut(cyl("y", p, 1.7, OUT - WALL - 1, OUT + 1))
 add("P03_back_foamex5T", back, C_FOAMEX, "포맥스 5T", "재단")
 
@@ -272,9 +278,7 @@ top = box(0, 0, WALL_H, OUT, OUT, OZ)
 EXH = (CH_CX - 20, 245, CH_CX + 20, 285)           # 배기 개구 40×40 (덕트 위 전실)
 top = top.cut(box(EXH[0], EXH[1], WALL_H - 1, EXH[2], EXH[3], OZ + 1))
 TOP_SCREWS = [(10, 10), (OUT - 10, 10), (10, OUT - 10), (OUT - 10, OUT - 10)]
-INSERT = dict(s=100, t=10.5)
-INSERT_SCREWS = [(CH_CX - 40, CH_CY), (CH_CX + 40, CH_CY)]
-for p in TOP_SCREWS + INSERT_SCREWS:
+for p in TOP_SCREWS:
     top = top.cut(cyl("z", p, 1.7, WALL_H - 1, OZ + 1))
 top_saved = top
 
@@ -283,29 +287,26 @@ top_saved = top
 # ============================================================
 foam_bot = box(IN0, IN0, WALL, IN1, IN1, IN0).cut(cyl("z", DRAIN, 4, 0, 20))
 foam_top = box(IN0, IN0, LID_Z, IN1, IN1, LID_Z + INS)
-foam_top = foam_top.cut(box(CH_CX - INSERT["s"] / 2 - 0.5, CH_CY - INSERT["s"] / 2 - 0.5, LID_Z - 1,
-                            CH_CX + INSERT["s"] / 2 + 0.5, CH_CY + INSERT["s"] / 2 + 0.5, LID_Z + INS + 1))
 foam_top = foam_top.cut(box(EXH[0], EXH[1], LID_Z - 1, EXH[2], EXH[3], LID_Z + INS + 1))
-foam_top = foam_top.cut(box(CH_CX + 50, CH_CY - 4, LID_Z + 4, IN1 + 1, CH_CY + 4, LID_Z + INS + 1))   # 케이블 홈 → 오른쪽 링 → PT2
 
 foam_L = box(WALL, WALL, IN0, IN0, OUT - WALL, LID_Z)
 foam_R = box(IN1, WALL, IN0, OUT - WALL, OUT - WALL, LID_Z)
 foam_F = box(IN0, WALL, IN0, IN1, IN0, LID_Z).cut(door_cut)
 foam_B = box(IN0, OUT - IN0, IN0, IN1, OUT - WALL, LID_Z)
-foam_B = foam_B.cut(box(INTAKE_C[0] - 27, OUT - IN0 - 1, INTAKE_C[1] - 27, INTAKE_C[0] + 27, OUT - WALL + 1, INTAKE_C[1] + 27))
+foam_B = foam_B.cut(box(INTAKE_C[0] - 29, OUT - IN0 - 1, INTAKE_C[1] - 29, INTAKE_C[0] + 29, OUT - WALL + 1, INTAKE_C[1] + 29))
 def side_foam_cuts(fm, xa, xb, right):
     for y in STRIP_BOLTS_Y:
         fm = fm.cut(cyl("x", (y, STRIP_Z - 5), 4, xa - 1, xb + 1))
     for z in DUCTANG_Z:
         fm = fm.cut(cyl("x", (DUCTANG_Y, z), 4, xa - 1, xb + 1))
     if right:
-        for p in (PT1, PT3, PT4):
-            fm = fm.cut(cyl("x", p, PWR["nut_od"] / 2 + 2, xa - 1, xb + 1))
+        for p in PTS:
+            fm = fm.cut(cyl("x", p, gl_nut(p) / 2 + 2, xa - 1, xb + 1))
         for p in (SHT_P, BME1_P):
             fm = fm.cut(cyl("x", p, 4, xa - 1, xb + 1))
     return fm
 foam_L = side_foam_cuts(foam_L, WALL, IN0, False)
-foam_R = side_foam_cuts(foam_R, IN1, OUT - WALL, True).cut(cyl("x", PT2, 4, IN1 - 1, OUT))
+foam_R = side_foam_cuts(foam_R, IN1, OUT - WALL, True)
 for z0 in HINGE_Z:
     for p in hinge_hole_pts(z0):
         foam_L = foam_L.cut(cyl("y", p, 4, WALL - 1, WALL + 4))
@@ -338,7 +339,7 @@ z_ch0 = FLOOR_TOP + LINER_GAP          # 83
 liners = {}
 liners["A01_liner_bay_bottom_270x270"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05).cut(cyl("z", DRAIN, 4, 0, 20))
 liners["A02_liner_bay_L_270x64.5"] = box(IN0, IN0, IN0 + T05, IN0 + T05, IN1, FLOOR_Z)
-liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1, 5, IN1 - 2, IN1 + 1))
+liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P, 5, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, 5, IN1 - 2, IN1 + 1))
 liners["A03_liner_bay_front_269x64.5"] = box(IN0 + T05, IN0, IN0 + T05, IN1 - T05, IN0 + T05, FLOOR_Z)   # v3.0 복구
 liners["A03_liner_bay_back_269x64.5"] = box(IN0 + T05, IN1 - T05, IN0 + T05, IN1 - T05, IN1, FLOOR_Z) \
     .cut(box(INTAKE_C[0] - 25, IN1 - 2, INTAKE_C[1] - 25, INTAKE_C[0] + 25, IN1 + 1, INTAKE_C[1] + 25))
@@ -358,7 +359,6 @@ liners["A04_liner_ch_L_270x171.5"] = ch_side(IN0, IN0 + T05, False)
 liners["A04_liner_ch_R_270x171.5"] = ch_side(IN1 - T05, IN1, True)
 liners["A06_liner_duct_back_269x174.5"] = box(IN0 + T05, IN1 - T05, FLOOR_Z, IN1 - T05, IN1, LID_Z - T05)
 ceil = box(IN0, IN0, LID_Z - T05, IN1, IN1, LID_Z)
-ceil = ceil.cut(box(CH_CX - INSERT["s"] / 2, CH_CY - INSERT["s"] / 2, LID_Z - 2, CH_CX + INSERT["s"] / 2, CH_CY + INSERT["s"] / 2, LID_Z + 1))
 ceil = ceil.cut(box(EXH[0], EXH[1], LID_Z - 2, EXH[2], EXH[3], LID_Z + 1))
 liners["A07_liner_ceiling_270x270"] = ceil
 for n, s_ in liners.items():
@@ -532,29 +532,8 @@ for side in ("L", "R"):
             nut(f"A14_nut_R_{j}", "x", (y, STRIP_Z - 5), xa - 1, -1)
 
 # ============================================================
-# 7. 천장: 센서 인서트 + TCS34725 + LED + 배기 플랩
+# 7. 천장: 배기 플랩 (v3.1: TCS34725·LED·센서 인서트 삭제)
 # ============================================================
-ins_z0, ins_z1 = LID_Z - T05, LID_Z + INS
-ins = box(CH_CX - 50, CH_CY - 50, ins_z0, CH_CX + 50, CH_CY + 50, ins_z1)
-ins = ins.cut(box(CH_CX - TCS["w"] / 2 - 0.5, CH_CY - TCS["d"] / 2 - 0.5, ins_z0 + 3,
-                  CH_CX + TCS["w"] / 2 + 0.5, CH_CY + TCS["d"] / 2 + 0.5, ins_z1 + 1))
-ins = ins.cut(cyl("z", (CH_CX, CH_CY), 3, ins_z0 - 1, ins_z0 + 4))
-for dy in (-30, 30):
-    ins = ins.cut(box(CH_CX - 26, CH_CY + dy - 4.5, ins_z0 - 1, CH_CX + 26, CH_CY + dy + 4.5, ins_z0 + 2))
-    ins = ins.cut(cyl("z", (CH_CX + 24, CH_CY + dy), 2, ins_z0, ins_z1 + 1))
-ins = ins.cut(box(CH_CX + 12, CH_CY - 4, ins_z1 - 4, CH_CX + 51, CH_CY + 4, ins_z1 + 1))
-ins = ins.cut(box(CH_CX + 21, CH_CY - 32, ins_z1 - 4, CH_CX + 27, CH_CY + 32, ins_z1 + 1))
-for p in INSERT_SCREWS:
-    ins = ins.cut(cyl("z", p, 2.0, ins_z1 - 6, ins_z1 + 1))
-    count("M3 열압입 인서트 (L4)")
-    bolt(f"S_insert_bolt_{p[0]}", "z", p, OZ, -1, 10)
-add("S01_sensor_insert_PETG_100x100", ins, C_PETG, "PETG", "3D프린트")
-add("S02_TCS34725_SEN0212", box(CH_CX - TCS["w"] / 2, CH_CY - TCS["d"] / 2, ins_z0 + 3,
-                                  CH_CX + TCS["w"] / 2, CH_CY + TCS["d"] / 2, ins_z0 + 3 + TCS["t"]), C_SENS, kind="buy",
-    note="DFRobot 18.51×23, 포켓에 끼우고 위에서 폼으로 누름")
-for dy in (-30, 30):
-    add(f"S03_LED_strip_50mm_{'F' if dy < 0 else 'B'}", box(CH_CX - 25, CH_CY + dy - 4, ins_z0 + 1, CH_CX + 25, CH_CY + dy + 4, ins_z0 + 2),
-        (1, 1, 0.85), kind="buy")
 flap_frame = box(EXH[0] - 10, EXH[1] - 5, OZ, EXH[2] + 10, EXH[3] + 5, OZ + 3) \
     .cut(box(EXH[0], EXH[1], OZ - 1, EXH[2], EXH[3], OZ + 4))
 add("S04_exhaust_flap_frame_PETG", flap_frame, C_PETG, "PETG", "3D프린트", note="천장판에 PVC본드")
@@ -640,31 +619,47 @@ for j, z in enumerate(HANDLE_Z):
 # ============================================================
 ix, iz = INTAKE_C
 ib_fl = OUT - WALL                       # 뒷판 안쪽 면 295
-ib_end = 250                             # 출구 (복귀실 안)
-ibox = box(ix - 26, ib_fl - 3, iz - 26, ix + 26, ib_fl, iz + 26)
-ibox = ibox.union(box(ix - 24, ib_end, iz - 24, ix + 24, ib_fl - 3, iz + 24)
-                  .cut(box(ix - 21.5, ib_end - 1, iz - 21.5, ix + 21.5, ib_fl - 2, iz + 21.5)))
-ibox = ibox.cut(cyl("y", INTAKE_C, 19, ib_fl - 4, ib_fl + 1))
+FL_T = 6                                 # 플랜지 두께 (커버 볼트용 인서트)
+ib_end = PART_Y1 + 20                    # 출구: 칸막이에서 20mm (v3.0은 9mm)
+fan_y1 = ib_fl - FL_T; fan_y0 = fan_y1 - FAN40["t"]
+ibox = box(ix - 28, fan_y1, iz - 28, ix + 28, ib_fl, iz + 28)
+ibox = ibox.union(box(ix - 24, ib_end, iz - 24, ix + 24, fan_y1, iz + 24))
+ibox = ibox.cut(box(ix - 21.5, ib_end - 1, iz - 21.5, ix + 21.5, fan_y1 + 0.01, iz + 21.5))
+ibox = ibox.cut(cyl("y", INTAKE_C, 19, fan_y1 - 1, ib_fl + 1))
 for p in INTAKE_HOLES:
-    ibox = ibox.cut(cyl("y", p, 1.7, ib_fl - 4, ib_fl + 1))
-fan_y1 = ib_fl - 3; fan_y0 = fan_y1 - FAN40["t"]
-CARB = (fan_y0 - 14, fan_y0 - 8)         # 활성탄 슬롯 y 범위 (팬 볼트 끝 뒤)
-BMES = (CARB[0] - 10, CARB[0] - 7.4)     # BME688 슬롯
-ibox = ibox.cut(box(ix - 21.5, CARB[0], iz + 20, ix + 21.5, CARB[1], iz + 25))
-ibox = ibox.cut(box(ix - 16, BMES[0], iz + 20, ix + 16, BMES[1], iz + 25))
-ibox = ibox.cut(cyl("z", (ix + 18, BMES[0] - 4), 3, iz + 20, iz + 25))
-add("I01_intake_box_PETG", ibox, C_PETG, "PETG", "3D프린트", note="v3.0 뒷판 안쪽. 슬롯 위는 테이프로 막음")
+    ibox = ibox.cut(cyl("y", p, 1.7, fan_y1 - 1, ib_fl + 1))
+for p in COVER_PTS:
+    ibox = ibox.cut(cyl("y", p, 2.0, ib_fl - 5, ib_fl + 1))
+    count("M3 열압입 인서트 (L4)")
+BME_Y0 = ib_end + 0.5                    # BME688 #2: +x 옆벽 홈, 흐름과 나란히 (막지 않음)
+ibox = ibox.cut(box(ix + 21.3, ib_end - 1, iz - BME["w"] / 2 - 0.3, ix + 23.2, BME_Y0 + BME["h"] + 0.3, iz + BME["w"] / 2 + 0.3))
+add("I01_intake_box_PETG", ibox, C_PETG, "PETG", "3D프린트",
+    note="v3.1 뒷판 안쪽. 플랜지 6T(커버용 인서트 2), BME688 #2는 +x 옆벽 홈에 출구 쪽에서 밀어 넣고 실리콘 한 점")
 fan40 = box(ix - FAN40["s"] / 2, fan_y0, iz - FAN40["s"] / 2, ix + FAN40["s"] / 2, fan_y1, iz + FAN40["s"] / 2).cut(cyl("y", INTAKE_C, 18.5, fan_y0 - 1, fan_y1 + 1))
 for p in INTAKE_HOLES:
     fan40 = fan40.cut(cyl("y", p, FAN40["hd"] / 2, fan_y0 - 1, fan_y1 + 1))
 add("I02_fan_40mm_intake_PWM", fan40, C_BLK, kind="buy")
-add("I03_carbon_pad", box(ix - 21, CARB[0] + 0.5, iz - 21, ix + 21, CARB[1] - 0.5, iz + 21), (0.1, 0.1, 0.1, 0.8), "활성탄 패드", "재단")
-add("I04_BME688_2_SEN0617", box(ix - BME["w"] / 2, BMES[0] + 0.5, iz - BME["h"] / 2, ix + BME["w"] / 2, BMES[0] + 0.5 + BME["t"], iz + BME["h"] / 2), C_SENS, kind="buy")
+add("I04_BME688_2_SEN0617", box(ix + 21.5, BME_Y0, iz - BME["w"] / 2, ix + 21.5 + BME["t"], BME_Y0 + BME["h"], iz + BME["w"] / 2), C_SENS, kind="buy",
+    note="센서 면이 관 안쪽을 봄")
 add("I05_intake_flap_PET", box(ix - 23, ib_end - 0.3, iz - 23, ix + 23, ib_end, iz + 23), (0.9, 0.9, 0.6, 0.6), "PET 0.3", "재단",
-    note="출구 윗변 테이프 힌지 (역류 방지)")
+    note="출구 윗변 테이프 힌지 (역류 방지). 칸막이까지 20mm")
 for i, p in enumerate(INTAKE_HOLES):
     bolt(f"I_bolt_{i}", "y", p, OUT, -1, 25, spec="M3×25 냄비머리 볼트 (흡기팬)")
     nut(f"I_nut_{i}", "y", p, fan_y0, -1)
+# 뒷판 바깥 활성탄 커버 (차가운 쪽: 데워진 활성탄이 흡착물을 다시 내놓는 것 방지, 바깥에서 교체)
+cv0 = OUT
+cover = box(ix - 29, cv0, iz - 29, ix + 29, cv0 + 11, iz + 29)
+cover = cover.cut(box(ix - 20, cv0 - 1, iz - 20, ix + 20, cv0 + 3, iz + 20))            # 테두리: 팬 볼트 머리 자리
+cover = cover.cut(box(ix - 22.2, cv0 + 3, iz - 22.2, ix + 22.2, cv0 + 8, iz + 22.2))     # 활성탄 포켓
+for dz in (-16, -8, 0, 8, 16):
+    cover = cover.cut(box(ix - 18, cv0 + 7, iz + dz - 2, ix + 18, cv0 + 12, iz + dz + 2))  # 그릴
+for p in COVER_PTS:
+    cover = cover.cut(cyl("y", p, 1.7, cv0 - 1, cv0 + 12))
+add("I06_intake_carbon_cover_PETG", cover, C_PETG, "PETG", "3D프린트", note="뒷판 바깥, M3×20 2개로 흡기 박스 플랜지 인서트에 고정")
+add("I03_carbon_pad", box(ix - 21.5, cv0 + 3.5, iz - 21.5, ix + 21.5, cv0 + 7.5, iz + 21.5), (0.1, 0.1, 0.1, 0.8), "활성탄 패드", "재단",
+    note="몇 회차마다 교체 (커버 볼트 2개)")
+for i, p in enumerate(COVER_PTS):
+    bolt(f"I_cover_bolt_{i}", "y", p, cv0 + 11, -1, 20, spec="M3×20 냄비머리 볼트 (활성탄 커버)")
 
 # ============================================================
 # 11. 전장부(본체) — 히터·팬·배플·65°C 서모스탯·DS18B20만
@@ -782,17 +777,18 @@ bolt("E07_bolt", "z", st_hole, IN0 + T05 + 1, -1, 6, spec="M3×6 냄비머리 �
 
 # 관통 글랜드 (본체 오른쪽 옆판, 돔은 측면 박스 쪽)
 def gland_x(name, P, note):
-    g = cyl("x", P, 6.0, OUT - WALL - 6, OUT + 3)
-    g = g.union(cq.Workplane("YZ").polygon(6, 19 / math.cos(math.pi / 6)).extrude(3).translate((OUT, P[0], P[1])))
-    g = g.union(cyl("x", P, 7.5, OUT + 3, OUT + 15))
-    g = g.union(cyl("x", P, PWR["nut_od"] / 2, OUT - WALL - 5, OUT - WALL))
-    g = g.cut(cyl("x", P, 2.6, OUT - WALL - 7, OUT + 16))
+    big = P in (PT1P, PT1S)
+    rb, af, rd, ri = (7.5, 22, 9.5, 4.0) if big else (6.0, 19, 7.5, 2.6)
+    g = cyl("x", P, rb, OUT - WALL - 6, OUT + 3)
+    g = g.union(cq.Workplane("YZ").polygon(6, af / math.cos(math.pi / 6)).extrude(3).translate((OUT, P[0], P[1])))
+    g = g.union(cyl("x", P, rd, OUT + 3, OUT + 15))
+    g = g.union(cyl("x", P, gl_nut(P) / 2, OUT - WALL - 5, OUT - WALL))
+    g = g.cut(cyl("x", P, ri, OUT - WALL - 7, OUT + 16))
     add(name, g, C_BLK, kind="buy", note=note)
-gland_x("K20_gland_PG7_bay", PT1, "전장부 → 측면 박스: 히터, 팬 2, DS18B20, 로드셀, BME688 #2")
+gland_x("K20_gland_PG9_bay_power", PT1P, "전장부 전력: PTC 2, 순환·흡기팬 전원 4 (케이블 4~8)")
+gland_x("K20_gland_PG9_bay_signal", PT1S, "전장부 신호: 팬 PWM·타코, DS18B20, 로드셀, BME688 #2 (다공 실 또는 실리콘 충전)")
 gland_x("K20_gland_PG7_duct", PT3, "BME688 #1")
 gland_x("K20_gland_PG7_chamber", PT4, "SHT31")
-add("K21_grommet_8_ceiling", cyl("x", PT2, 4.0, OUT - WALL - 1, OUT + 1).cut(cyl("x", PT2, 2.5, OUT - WALL - 2, OUT + 2))
-    .union(cyl("x", PT2, 6, OUT, OUT + 1).cut(cyl("x", PT2, 2.5, OUT - 1, OUT + 2))), C_BLK, kind="buy", note="천장 TCS·LED, Ø8 그로밋 + 중성 실리콘")
 
 # ============================================================
 # 12. 측면 박스 (K) — 전자레인지 조작부처럼 본체 오른쪽
@@ -849,9 +845,8 @@ for i, (y, z) in enumerate(K_LID_PTS):
 # 세로 장착판 (본체 옆판 바깥면에 접착) — 구멍: 관통구·볼트 머리
 BP_Y0, BP_Y1, BP_Z0, BP_Z1 = 13, OUT - 6, 20, WALL_H - 1
 bp = box(BP_X0, BP_Y0, BP_Z0, BP_X1, BP_Y1, BP_Z1)
-for p in (PT1, PT3, PT4):
-    bp = bp.cut(cyl("x", p, 12, BP_X0 - 1, BP_X1 + 1))
-bp = bp.cut(cyl("x", PT2, 6.5, BP_X0 - 1, BP_X1 + 1))
+for p in PTS:
+    bp = bp.cut(cyl("x", p, gl_nut(p) / 2 + 1, BP_X0 - 1, BP_X1 + 1))
 for p in [SHT_P, BME1_P] + [(y, STRIP_Z - 5) for y in STRIP_BOLTS_Y] + [(DUCTANG_Y, z) for z in DUCTANG_Z]:
     bp = bp.cut(cyl("x", p, 4, BP_X0 - 1, BP_X1 + 1))
 
@@ -874,9 +869,9 @@ def board_x(name, y0, z0, w, d, x0, t=1.6, holes=(), color=C_PCB, note="", kind=
         b = b.union(box(x0 + t, py0, pz0, x0 + t + ph, py0 + pw, pz0 + pd))
     add(name, b, color, kind=kind, note=note)
 
-# 아래: DFR0457 ×3 (히터 / LED / 흡기팬 전원 차단)
+# 아래: DFR0457 ×2 (#1 히터 / #3 흡기팬 전원 차단). v3.1: #2(LED) 삭제, 번호는 그대로
 MOS_Z0 = 24
-for i, y0 in enumerate((50, 100, 150)):
+for i, y0 in ((0, 50), (2, 150)):
     w, d, h = MOD["MOS_1"]
     hy1 = y0 + w - MOS["hole_edge"]
     hs = [(hy1 - sy * MOS["hole_sp_x"], MOS_Z0 + MOS["hole_edge"] + sz * MOS["hole_sp_y"]) for sy in (0, 1) for sz in (0, 1)]
@@ -926,14 +921,14 @@ for i, p in enumerate(exp_holes):
     bolt(f"E01_bolt_{i}", "x", p, ex_x0 + EXP["t"], -1, 6, spec="M3×6 냄비머리 볼트 (보드→스탠드오프)")
 
 # 가운데: 소형 모듈 캐리어 (SD·HX711·MP1584·부저), 모듈은 y 방향으로 나란히
-CR_Y0, CR_Y1, CR_Z0, CR_Z1 = 116, 286, 68, 112
+CR_Y0, CR_Y1, CR_Z0, CR_Z1 = 116, 246, 68, 112   # v3.1 부저 삭제로 짧아짐
 cr_x0 = BP_X1 + 20
 carrier = box(cr_x0, CR_Y0, CR_Z0, cr_x0 + 3, CR_Y1, CR_Z1)
 cr_holes = [(CR_Y0 + 4, CR_Z0 + 4), (CR_Y1 - 4, CR_Z0 + 4), (CR_Y0 + 4, CR_Z1 - 4), (CR_Y1 - 4, CR_Z1 - 4)]
 for p in cr_holes:
     carrier = carrier.cut(cyl("x", p, 1.7, cr_x0 - 1, cr_x0 + 4))
 yy = CR_Y0 + 8
-for k in ("SD", "HX711", "MP1584", "BUZZER"):
+for k in ("SD", "HX711", "MP1584"):
     w, d, h = MOD[k]
     mz0 = (CR_Z0 + CR_Z1) / 2 - d / 2
     rim = box(cr_x0 + 3, yy - 2, mz0 - 2, cr_x0 + 5, yy + w + 2, mz0 + d + 2).cut(box(cr_x0 + 2, yy - 0.3, mz0 - 0.3, cr_x0 + 6, yy + w + 0.3, mz0 + d + 0.3))
@@ -943,7 +938,7 @@ for k in ("SD", "HX711", "MP1584", "BUZZER"):
     add(f"E04_{k}", box(cr_x0 + 3, yy, mz0, cr_x0 + 3 + h, yy + w, mz0 + d), C_PCB if k != "BUZZER" else C_BLK, kind="buy")
     yy += w + 6
 assert yy - 6 <= CR_Y1 - 4, yy
-add("E03_module_carrier_PETG", carrier, C_PETG, "PETG", "3D프린트", note="측면 박스 안, 포켓 + 케이블타이")
+add("E03_module_carrier_PETG", carrier, C_PETG, "PETG", "3D프린트", note="측면 박스 안, SD·HX711·MP1584 포켓 + 케이블타이")
 for i, p in enumerate(cr_holes):
     so_bp(f"E03_so_{i}", p[0], p[1], 20)
     bolt(f"E03_bolt_{i}", "x", p, cr_x0 + 3, -1, 8, spec="M3×8 냄비머리 볼트 (캐리어)")
@@ -1025,7 +1020,7 @@ GROUPS = [   # (그룹, 이 접두어로 시작하는 부품) — 위에서부�
     ("07_intake",              ("I0",)),
     ("08_electronics",         ("E",)),
     ("09_loadcell_tray",       ("L0", "A11", "T0")),
-    ("10_sensors_ceiling",     ("S0",)),
+    ("10_exhaust_ceiling",     ("S0",)),
     ("11_sensors_chamber",     ("C0",)),
     ("12_side_box",            ("K",)),
 ]
