@@ -35,12 +35,12 @@ else:
 plt.rcParams["axes.unicode_minus"]=False
 m=None; OUTDIR=None
 
-FLAT_PREFIX=("P01","P02","P03","P04","P06","P07","D01","D02","D03","F0","A0","A10","A11","T02","I03","S05","I05")
-TITLE={"P01_side_L":"옆판 왼쪽","P01_side_R":"옆판 오른쪽","P02_front":"앞판","P03_back":"뒷판","P04_duct":"덕트·칸막이 벽",
+FLAT_PREFIX=("P01","P02","P03","P06","P07","D01","D02","D03","F0","A0","A10","A11","A15","A16","T02","T04","I03","S05","I05","K01","K02","K03","K04","K05","K06")
+TITLE={"P01_side_L":"옆판 왼쪽","P01_side_R":"옆판 오른쪽","P02_front":"앞판","P03_back":"뒷판","A15":"전장부 칸막이(알루미늄)","A16":"덕트 벽(알루미늄)","T04":"트레이 가운데 판","K01":"측면 박스 앞판","K02":"측면 박스 뒷판","K03":"측면 박스 바닥","K04":"측면 박스 천장","K05":"측면 박스 뚜껑","K06":"측면 박스 장착판",
  "P06_bottom":"바닥판","P07_top":"천장판","D01_door":"문 바깥판","D02_door_plug":"문 플러그(폼)","D03_door_plug_liner":"문 플러그 라이너",
  "F01":"바닥 단열 폼","F02":"천장 단열 폼","F03_foam_side_L":"왼쪽 단열 폼","F03_foam_side_R":"오른쪽 단열 폼","F04_foam_front":"앞 단열 폼",
  "F04_foam_back":"뒤 단열 폼","F05":"펠티어 구멍 막음 폼","A01":"전장부 바닥 라이너","A02_liner_bay_L":"전장부 왼쪽 라이너","A02_liner_bay_R":"전장부 오른쪽 라이너",
- "A03_liner_bay_back":"전장부 뒤 라이너","A04_liner_ch_L":"챔버 왼쪽 라이너","A04_liner_ch_R":"챔버 오른쪽 라이너","A05":"챔버 뒤(덕트 벽 앞) 라이너",
+ "A03_liner_bay_front":"전장부 앞 라이너","A03_liner_bay_back":"전장부 뒤 라이너","A04_liner_ch_L":"챔버 왼쪽 라이너","A04_liner_ch_R":"챔버 오른쪽 라이너","A05":"챔버 뒤(덕트 벽 앞) 라이너",
  "A06":"덕트 뒤 라이너","A07":"천장 라이너","A10":"타공판","A11":"로드셀 차폐판","T02":"트레이 메시","I03":"활성탄 패드","S05":"배기 플랩(PET)","I05":"흡기 플랩(PET)"}
 def title_of(n):
     for k,v in TITLE.items():
@@ -259,7 +259,7 @@ def write_dxf(d,fn):
 
 HOLES_PDF="herb_dryer_holes.pdf"          # 구멍표 (판마다 1쪽)
 PRINT_PDF="herb_dryer_print_1to1.pdf"     # 1:1 분할 인쇄 (포맥스판)
-TILE=("P01","P02","P03","P04","P06","P07","D01")
+TILE=("P01","P02","P03","P06","P07","D01","K01","K02","K03","K04","K05","K06")
 
 def run(cad_module, outdir, version=""):
     """cad_module: 실행된 CAD 모듈 (PARTS 보유). 실패한 판 이름 목록을 돌려준다."""
