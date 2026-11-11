@@ -72,6 +72,7 @@ def run(cad_module, outdir=".", which="all", version=""):
     if which in ("all","sec"):
         section("r5_section_x65.png", 65, f"{tag}section x=65 (fan/PTC axis), seen from left; front=left")
         section("r6_section_x150.png", 150, f"{tag}section x=150 (loadcell/sensor), seen from left")
+        section("r7_section_x220.png", 220, f"{tag}section x=220 (intake axis), seen from left")
     if which=="dbg":
         shot("dbg.png", lambda n,p: n.startswith(("H0","A12","A13")), [(-200,-250,320),(70,170,40),(0,0,1)], "heater debug")
 
