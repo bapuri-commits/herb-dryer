@@ -128,6 +128,12 @@ def run(cad_module, outdir, version=""):
     return items
 
 
+def feat_xy(g):
+    if g[0] == "circle": return g[1]
+    xs = [q[0] for q in g[1]]; ys = [q[1] for q in g[1]]
+    return ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+
+
 def write_pdf(items, fn, version):
     with PdfPages(fn) as pdf:
         fig = plt.figure(figsize=(8.27, 11.69)); fig.text(0.08, 0.95, f"허브 건조기 외관 포맥스 발주 {version}", fontsize=14)
@@ -142,22 +148,42 @@ def write_pdf(items, fn, version):
                      + (f" + 개구부 {len(it['inner'])}" if it["inner"] else ""), fontsize=7.5); y -= 0.02
         pdf.savefig(fig); plt.close(fig)
         for it in items:
-            fig = plt.figure(figsize=(11.69, 8.27)); ax = fig.add_axes([0.06, 0.08, 0.88, 0.8]); ax.set_aspect("equal")
+            fig = plt.figure(figsize=(11.69, 8.27)); ax = fig.add_axes([0.06, 0.10, 0.60, 0.76]); ax.set_aspect("equal")
+            W, H = it["W"], it["H"]
             for o in it["outer"]:
                 xs = [q[0] for q in o[1]] + [o[1][0][0]]; ys = [q[1] for q in o[1]] + [o[1][0][1]]; ax.plot(xs, ys, "k-", lw=1)
-            for g in it["inner"]:
-                if g[0] == "circle": ax.add_patch(plt.Circle(g[1], g[2], fill=False, color="g", lw=1))
+            rows = []
+            feats = [("C", g, "g") for g in it["inner"]] + [("D", g, "r") for g in it["drill"]]
+            feats.sort(key=lambda t: (t[0], round(feat_xy(t[1])[1]), feat_xy(t[1])[0]))
+            n = {"C": 0, "D": 0}
+            for kind, g, col in feats:
+                n[kind] += 1; fid = f"{kind}{n[kind]}"
+                x, y = feat_xy(g)
+                if g[0] == "circle":
+                    ax.add_patch(plt.Circle(g[1], g[2], fill=False, color=col, lw=0.9)); size = f"Ø{2 * g[2]:.1f}"
                 else:
-                    xs = [q[0] for q in g[1]] + [g[1][0][0]]; ys = [q[1] for q in g[1]] + [g[1][0][1]]; ax.plot(xs, ys, "g-", lw=1)
-            for g in it["drill"]: ax.add_patch(plt.Circle(g[1], g[2], fill=False, color="r", lw=0.8))
-            W, H = it["W"], it["H"]
-            ax.annotate("", (0, -8), (W, -8), arrowprops=dict(arrowstyle="<->", lw=0.6)); ax.text(W / 2, -16, f"{W}", ha="center", fontsize=9)
-            ax.annotate("", (-8, 0), (-8, H), arrowprops=dict(arrowstyle="<->", lw=0.6)); ax.text(-12, H / 2, f"{H}", ha="right", va="center", fontsize=9)
-            ax.set_xlim(-40, W + 20); ax.set_ylim(-30, H + 20); ax.axis("off")
+                    xs = [q[0] for q in g[1]] + [g[1][0][0]]; ys = [q[1] for q in g[1]] + [g[1][0][1]]; ax.plot(xs, ys, "-", color=col, lw=0.9)
+                    size = f"{max(xs) - min(xs):.1f}×{max(ys) - min(ys):.1f}"
+                ax.plot([x], [y], "+", color=col, ms=5, mew=0.6)
+                ax.annotate(fid, (x, y), fontsize=6.5, color=col, xytext=(4, 3), textcoords="offset points")
+                rows.append((fid, "드릴" if kind == "D" else "개구부", size, f"{x:.1f}", f"{y:.1f}"))
+            ax.annotate("", (0, -10), (W, -10), arrowprops=dict(arrowstyle="<->", lw=0.6)); ax.text(W / 2, -20, f"{W}", ha="center", fontsize=9)
+            ax.annotate("", (-10, 0), (-10, H), arrowprops=dict(arrowstyle="<->", lw=0.6)); ax.text(-14, H / 2, f"{H}", ha="right", va="center", fontsize=9)
+            ax.plot([0], [0], "ko", ms=4); ax.text(2, 3, "원점 (0,0)", fontsize=7)
+            ax.set_xticks(range(0, int(W) + 1, 50)); ax.set_yticks(range(0, int(H) + 1, 50)); ax.tick_params(labelsize=6)
+            ax.grid(True, lw=0.3, color="0.85"); ax.set_xlim(-45, W + 15); ax.set_ylim(-32, H + 15)
+            for sp in ax.spines.values(): sp.set_visible(False)
             proc = "외곽 + 구멍" if it["group"] == "A" else ("외곽 + 문 개구부만" if it["name"].startswith("P02") else "외곽만 (구멍은 직접)")
-            fig.text(0.06, 0.93, f"{it['name']}  {it['title']}   {W}×{H}  수량 {it['qty']}   [{it['group']} 묶음: {proc}]   {version}", fontsize=11)
-            fig.text(0.06, 0.90, f"그림 = {it['face']} (이 면이 위로 오게 가공)", fontsize=9, color="b")
-            fig.text(0.06, 0.04, f"검정 = 외곽, 초록 = 안쪽 개구부 {len(it['inner'])}, 빨강 = 드릴 {drill_summary(it['drill']) or '-'}"
+            fig.text(0.06, 0.94, f"{it['name']}  {it['title']}   {W}×{H}  수량 {it['qty']}   [{it['group']} 묶음: {proc}]   {version}", fontsize=11)
+            fig.text(0.06, 0.91, f"그림 = {it['face']} (이 면이 위로 오게 가공).  좌표 원점 = 그림의 왼쪽 아래 모서리, X 오른쪽 +, Y 위쪽 +, 단위 mm", fontsize=8.5, color="b")
+            tx = 0.69; ty = 0.86
+            fig.text(tx, ty, "ID   종류    크기          X        Y", fontsize=8); ty -= 0.025
+            if not rows:
+                fig.text(tx, ty, "업체 가공 구멍 없음" + ("" if it["group"] == "A" else "\n(구멍 위치는 구멍표 PDF, 부품 실측 후 직접)"), fontsize=8)
+            for r_ in rows:
+                fig.text(tx, ty, f"{r_[0]:<4} {r_[1]:<4} {r_[2]:<12} {r_[3]:>7} {r_[4]:>7}", fontsize=7.5); ty -= 0.021
+            fig.text(tx, 0.06, "원 = 중심 좌표, 사각 = 중심 좌표 (크기는 가로×세로)\nDXF에도 같은 좌표가 그대로 들어 있음", fontsize=7)
+            fig.text(0.06, 0.04, f"검정 = 외곽, 초록 = 안쪽 개구부, 빨강 = 드릴"
                      + (f"   (CAD 구멍 {it['n_all']}개 중 업체 가공 {len(it['inner']) + len(it['drill'])}개, 포켓 {it['n_pockets']}개는 직접)" if it['n_all'] or it['n_pockets'] else ""), fontsize=8)
             pdf.savefig(fig); plt.close(fig)
 
