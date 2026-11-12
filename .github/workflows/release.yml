@@ -47,6 +47,7 @@ jobs:
           cp build/drawings/herb_dryer_holes.pdf          "dist/${P}_holes.pdf"
           cp build/drawings/herb_dryer_print_1to1.pdf     "dist/${P}_print_1to1.pdf"
           (cd build/drawings/dxf && zip -q -r "../../../dist/${P}_dxf.zip" .)
+          (cd build/vendor/foamex && zip -q -r "../../../dist/${P}_vendor_foamex.zip" .)
           (cd build/stl && zip -q -r "../../dist/${P}_stl.zip" .)
           for f in build/render/*.png; do [ -f "$f" ] && cp "$f" "dist/${P}_$(basename "$f")"; done
           cp bom/herb_dryer_BOM.xlsx                      "dist/herb_dryer_BOM_${TAG}.xlsx"

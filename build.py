@@ -9,6 +9,7 @@
   step      build/herb_dryer.step
   check     간섭 검사 → build/interference.txt   (1건이라도 있으면 빌드 실패, 1차↔2차 제외)
   drawings  build/drawings/ 구멍표 PDF, 1:1 인쇄 PDF, dxf/
+  vendor    build/vendor/foamex/ 외주 발주 패키지 (포맥스 외관판 DXF, 발주표, 확인도면)
   stl       build/stl/ 3D 프린트 부품 STL (파일 이름에 버전)
   render    build/render/ 외관·내부·단면 PNG (실패해도 빌드는 계속)
   csv       build/fasteners.csv, build/print_parts.csv
@@ -29,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 CAD = ROOT / "cad" / "herb_dryer_cad.py"
 TOOLS = ROOT / "cad" / "tools"
 BOM = ROOT / "bom" / "herb_dryer_BOM.xlsx"
-STEPS = ["step", "check", "drawings", "stl", "render", "csv", "bom"]
+STEPS = ["step", "check", "drawings", "vendor", "stl", "render", "csv", "bom"]
 
 
 def version() -> str:
@@ -74,7 +75,7 @@ def main():
 
     failed, warned = [], []
     m = None
-    if set(steps) & {"step", "check", "drawings", "stl", "csv"}:
+    if set(steps) & {"step", "check", "drawings", "vendor", "stl", "csv"}:
         log("CAD 실행 (params.yaml 읽기)")
         t = time.time()
         m = load(CAD, "herb_cad")
@@ -101,6 +102,11 @@ def main():
         fails = dr.run(m, out / "drawings", version=ver)
         if fails:
             warned.append(f"도면 실패 판: {fails}")
+
+    if "vendor" in steps:
+        log("3b. 외주 발주 패키지 (포맥스 외관판)")
+        vp = load(TOOLS / "vendor_pack.py", "herb_vendor_pack")
+        vp.run(m, out / "vendor", version=ver)
 
     if "stl" in steps:
         log("4. 3D 프린트 STL")
