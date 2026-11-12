@@ -1,2 +1,6 @@
+# PlatformIO 빌드 산출물
 .pio/
-.vscode/
+
+# VS Code: 개인/자동 생성 설정은 제외, 확장 추천만 공유
+.vscode/*
+!.vscode/extensions.json

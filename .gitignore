@@ -11,4 +11,5 @@ Thumbs.db
 
 # PlatformIO
 firmware/.pio/
-firmware/.vscode/
+firmware/.vscode/*
+!firmware/.vscode/extensions.json
