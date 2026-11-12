@@ -3,8 +3,9 @@
 python cad/tools/vendor_pack.py <cad.py> [출력폴더]
 
 결과 (출력폴더/foamex/):
-  dxf/<판>.dxf       판마다 1개, 단위 mm, 1:1
-  all_panels.dxf     모든 판을 한 장에 늘어놓은 것 (견적용, 배치는 업체가)
+  dxf/<판>.dxf       판마다 1개, 단위 mm, 1:1, AutoCAD 2000(R2000) 형식
+  dxf_R12/           같은 내용, AutoCAD R12 형식 (구버전 CAM용)
+  */all_panels.dxf   모든 판을 한 장에 늘어놓은 것 (견적용, 배치는 업체가)
   발주표.xlsx        판·크기·수량·가공 범위·구멍 수, 업체 전달 사항
   확인도면.pdf       판마다 1쪽 (외곽 치수, 구멍 지름별 개수)
 
@@ -43,6 +44,7 @@ EXTRA = [  # CAD 판이 아닌 추가 조각
 VENDOR_NOTES = [
     f"재료: {MATERIAL}, 모든 판 같은 두께",
     "치수는 완성 치수 (공구 보정은 업체에서). 공차 ±0.5mm, 외곽 직각",
+    "DXF: dxf/ = AutoCAD 2000 형식, dxf_R12/ = R12 형식 (같은 내용). 단위 mm, 1:1",
     "CUT_OUTER = 외곽 절단, CUT_INNER = 안쪽 개구부 절단, DRILL = 구멍 가공 (Ø 그대로), NOTE = 글자 — 자르지 마세요",
     "안쪽 모서리는 공구 반경 R1.5 이하 둥글어도 됩니다",
     "B 묶음은 외곽만 (구멍은 저희가 직접 뚫습니다). 앞판 P02는 문 개구부만 잘라 주세요",
@@ -68,19 +70,31 @@ def classify(d, group):
     return outer, inner, drill
 
 
+FACE_EN = {"바깥(왼쪽)에서 본 면": "OUTSIDE (left side)", "바깥(오른쪽)에서 본 면": "OUTSIDE (right side)",
+           "앞에서 본 면": "FRONT (outside)", "뒤(바깥)에서 본 면": "BACK (outside)",
+           "위에서 본 면 (아래쪽=앞)": "TOP VIEW (bottom edge = front)", "어느 면이든": "ANY"}
+# 업체 요청으로 낮은 버전도 함께: R2000(AutoCAD 2000) 기본 + R12(가장 호환 좋음)
+DXF_VERSIONS = (("R2000", "dxf"), ("R12", "dxf_R12"))
+
+
 def add_part(ms, d, outer, inner, drill, ox=0.0, oy=0.0, label=None):
     def P(pts): return [(x + ox, y + oy) for x, y in pts]
-    for o in outer: ms.add_lwpolyline(P(o[1]), close=True, dxfattribs={"layer": "CUT_OUTER"})
+    r12 = ms.doc.dxfversion == "AC1009"
+    def poly(pts, layer):
+        if r12: ms.add_polyline2d(P(pts), close=True, dxfattribs={"layer": layer})
+        else: ms.add_lwpolyline(P(pts), close=True, dxfattribs={"layer": layer})
+    for o in outer: poly(o[1], "CUT_OUTER")
     for g in inner:
         if g[0] == "circle": ms.add_circle((g[1][0] + ox, g[1][1] + oy), g[2], dxfattribs={"layer": "CUT_INNER"})
-        else: ms.add_lwpolyline(P(g[1]), close=True, dxfattribs={"layer": "CUT_INNER"})
+        else: poly(g[1], "CUT_INNER")
     for g in drill: ms.add_circle((g[1][0] + ox, g[1][1] + oy), g[2], dxfattribs={"layer": "DRILL"})
     if label:
         ms.add_text(label, height=6, dxfattribs={"layer": "NOTE"}).set_placement((ox, oy - 12))
 
 
-def new_doc():
-    doc = ezdxf.new(setup=True); doc.units = ezdxf.units.MM
+def new_doc(ver="R2000"):
+    doc = ezdxf.new(ver)
+    if ver != "R12": doc.units = ezdxf.units.MM
     for ln, col in (("CUT_OUTER", 7), ("CUT_INNER", 3), ("DRILL", 1), ("NOTE", 8)):
         doc.layers.add(ln, color=col)
     return doc
@@ -95,8 +109,10 @@ def rect_poly(W, H): return ("poly", [(0, 0), (W, 0), (W, H), (0, H)], None)
 
 
 def run(cad_module, outdir, version=""):
-    out = os.path.join(str(outdir), "foamex"); os.makedirs(out + "/dxf", exist_ok=True)
-    for f in os.listdir(out + "/dxf"): os.remove(os.path.join(out, "dxf", f))
+    out = os.path.join(str(outdir), "foamex")
+    for _, sub in DXF_VERSIONS:
+        os.makedirs(f"{out}/{sub}", exist_ok=True)
+        for f in os.listdir(f"{out}/{sub}"): os.remove(os.path.join(out, sub, f))
     parts = [p for p in cad_module.PARTS if p["phase"] == 1 and p["name"].startswith(GROUP_A + GROUP_B)]
     items = []
     for p in sorted(parts, key=lambda p: (0 if p["name"].startswith(GROUP_A) else 1, p["name"])):
@@ -108,17 +124,20 @@ def run(cad_module, outdir, version=""):
                           n_pockets=len(d["pockets"]), n_all=len(d["through"])))
     for e in EXTRA:
         items.append(dict(e, face="어느 면이든", outer=[rect_poly(e["W"], e["H"])], inner=[], drill=[], n_pockets=0, n_all=0))
-    for it in items:
-        doc = new_doc(); ms = doc.modelspace()
-        add_part(ms, None, it["outer"], it["inner"], it["drill"], label=f"{it['name']}  {it['W']}x{it['H']}  qty {it['qty']}  {version}  VIEW: {it['face']}")
-        doc.saveas(os.path.join(out, "dxf", f"{it['name']}.dxf"))
-    # 한 장 배치 (견적용)
-    doc = new_doc(); ms = doc.modelspace(); x = y = 0.0; rowh = 0.0
-    for it in items:
-        if x + it["W"] > 1300: x = 0.0; y -= rowh + 40; rowh = 0.0
-        add_part(ms, None, it["outer"], it["inner"], it["drill"], ox=x, oy=y - it["H"], label=f"{it['name']} x{it['qty']}")
-        x += it["W"] + 30; rowh = max(rowh, it["H"])
-    doc.saveas(os.path.join(out, "all_panels.dxf"))
+    for ver, sub in DXF_VERSIONS:
+        for it in items:
+            doc = new_doc(ver); ms = doc.modelspace()
+            add_part(ms, None, it["outer"], it["inner"], it["drill"],
+                     label=f"{it['name']}  {it['W']}x{it['H']}  qty {it['qty']}  {version}  VIEW: {FACE_EN.get(it['face'], it['face'])}")
+            doc.saveas(os.path.join(out, sub, f"{it['name']}.dxf"))
+        # 한 장 배치 (견적용)
+        doc = new_doc(ver); ms = doc.modelspace(); x = y = 0.0; rowh = 0.0
+        for it in items:
+            if x + it["W"] > 1300: x = 0.0; y -= rowh + 40; rowh = 0.0
+            add_part(ms, None, it["outer"], it["inner"], it["drill"], ox=x, oy=y - it["H"], label=f"{it['name']} x{it['qty']}")
+            x += it["W"] + 30; rowh = max(rowh, it["H"])
+        doc.saveas(os.path.join(out, sub, "all_panels.dxf"))
+    if os.path.exists(os.path.join(out, "all_panels.dxf")): os.remove(os.path.join(out, "all_panels.dxf"))
     write_pdf(items, os.path.join(out, "확인도면.pdf"), version)
     write_xlsx(items, os.path.join(out, "발주표.xlsx"), version)
     json.dump([{k: it[k] for k in ("name", "title", "W", "H", "group", "qty")} | {"drill": drill_summary(it["drill"]), "inner": len(it["inner"])}
