@@ -13,7 +13,7 @@
 # 키 이름은 CAD 스크립트 안의 변수 이름과 같다 (예: PTC.w → PTC["w"]).
 # ============================================================
 
-PTC:   # PTC 12V 50W 핀 발열체 (디바이스마트 SZH-PTC002) → H02 히터 덕트, H03, H04 귀 받침
+PTC:   # PTC 핀 발열체 → H06 히터 덕트, H03, H07 귀 덮개 (v3.0부터 100W 사용 예정 — 아래 값은 50W SZH-PTC002 기준, 100W 도착 후 실측으로 교체)
   bom: 8
   w:          {value: 95,  status: 판매처 표기, source: "https://www.devicemart.co.kr/goods/view?no=14075260 '95x31' (귀 포함 전체 길이로 가정)"}
   h:          {value: 31,  status: 판매처 표기, source: "SZH-PTC002 '95x31'"}
@@ -136,4 +136,27 @@ KSD:   # 서모스탯 KSD301 (Xucheng 승인서 KSD301-060 p.5 외형도, 동계
   br_hole_sp: {value: 24,  status: 판매처 표기, source: "브래킷 구멍 간격 24±0.5"}
   br_t:      {value: 0.8,  status: 판매처 표기, source: "브래킷 두께 0.8"}
   lead_len:  {value: 25,   status: 가정, source: "탭에 꽂는 압착 완료 패스턴 리드선 단자 길이 + 굽힘 여유"}
+
+# ---- v3.1.2: CAD 안에 박혀 있던 값을 옮김 (실측하면 여기만 고친다) ----
+PG9:   # PG9 케이블 글랜드 → 오른쪽 옆판 전장부 관통 2개 (K20), 폼·장착판 구멍
+  bom: 64
+  d:      {value: 15.5, status: 가정, source: "PG9 표준 장착 구멍 15.2 + 0.3"}
+  nut_od: {value: 24.0, status: 가정, source: "PG9 안쪽 너트 외경 (폼 포켓·장착판 구멍 크기)"}
+
+HANDLE: # 문 표면 손잡이 → 문 바깥판 D01 구멍 (D07)
+  bom: 62
+  hole_sp: {value: 96,  status: 가정, source: "가구 손잡이 표준 구멍 간격 96mm (구매품 확인)"}
+  hole_d:  {value: 4.5, status: 가정, source: "M4 볼트 통과 구멍"}
+
+ROCKER: # 로커 스위치 KCD1 → 측면 박스 뒷판 K02 (E09)
+  bom: 19
+  cut_w:   {value: 19.2, status: 가정, source: "KCD1-101 장착 구멍 19×12.8 표기 + 여유"}
+  cut_h:   {value: 12.9, status: 가정, source: "KCD1-101 장착 구멍 19×12.8 표기 + 여유"}
+  bezel_w: {value: 25.0, status: 가정, source: "베젤 21×15 + 여유 (안쪽 카운터보어)"}
+  bezel_h: {value: 18.0, status: 가정, source: "베젤 21×15 + 여유"}
+
+MAG:   # 문 자석 8×3 네오디뮴 → 앞판 P02·문 D01 자석 포켓 (D05)
+  bom: 36
+  d: {value: 8.2, status: 가정, source: "Ø8 자석 + 0.2"}
+  t: {value: 3.0, status: 가정, source: "자석 두께 = 포켓 깊이"}
 
