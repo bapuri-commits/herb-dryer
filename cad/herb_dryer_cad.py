@@ -91,7 +91,7 @@ SO_Z = WALL                     # 스탠드오프 시작 높이(바닥판 윗면
 # 구매 부품 치수 — [실측] 값은 params.yaml 에서
 FAN60 = PARAMS["FAN60"]                        # 60mm 순환팬 (s, t, hole, hd)
 FAN40 = PARAMS["FAN40"]                        # 40mm 흡기팬
-PTC = PARAMS["PTC"]                            # [실측] PTC 50W 핀 (w=귀 포함 길이 x, d=공기 방향 y, h=높이 z)
+PTC = PARAMS["PTC"]                            # [실측] PTC 핀 (w=귀 포함 길이 x, d=공기 방향 y, h=높이 z). 100W 도착 후 실측
 EXP = PARAMS["EXP"]                            # [실측] ESP32 38핀 확장보드 (판매처마다 68~78×53~63)
 DEVKIT = dict(w=27.9, d=54.4, t=1.6)           # ESP32 DevKitC V4 (공식 54.4×27.9)
 LCD = PARAMS["LCD"]                            # [실측] LCD1602 + I2C 백팩
@@ -207,7 +207,7 @@ BP_X0, BP_X1 = OUT, OUT + WALL                 # 측면 박스 세로 장착판 
 # 오른쪽 옆판 관통구 (y, z) — 본체 ↔ 측면 박스
 PT1P = (22, 33)           # 전장부 전력: PTC 2, 팬 전원 4 (PG9)
 PT1S = (42, 57)           # 전장부 신호: 팬 PWM·타코 4, DS18B20 3, 로드셀 4, BME688 #2 4 (PG9)
-PG9 = dict(d=15.5, nut_od=24.0)          # PG9 글랜드: 장착 구멍, 너트 외경 [가정]
+PG9 = PARAMS["PG9"]                       # PG9 글랜드: 장착 구멍, 너트 외경 (params.yaml)
 PT3 = (215, 237)          # 전실: BME688 #1 (PG7)
 PT4 = (165, 170)          # 챔버: SHT31 (PG7)
 PTS = (PT1P, PT1S, PT3, PT4)
@@ -253,9 +253,10 @@ def hinge_hole_pts(z0):
 for z0 in HINGE_Z:
     for p in hinge_hole_pts(z0):
         front = front.cut(cyl("y", p, 1.7, -1, WALL + 1))
-MAG_X = 290.0; MAG_Z = (110, 166, 222); MAG_D = 8.2   # 8×3 네오디뮴
+MAG = PARAMS["MAG"]
+MAG_X = 290.0; MAG_Z = (110, 166, 222); MAG_D = MAG["d"]   # 8×3 네오디뮴 (params.yaml)
 for mz in MAG_Z:
-    front = front.cut(cyl("y", (MAG_X, mz), MAG_D / 2, -1, 3))
+    front = front.cut(cyl("y", (MAG_X, mz), MAG_D / 2, -1, MAG["t"]))
 add("P02_front_foamex5T", front, C_FOAMEX, "포맥스 5T", "재단")
 
 # 뒷판: 290 × 265 — v3.0: 흡기 입구만 (복귀실 직결)
@@ -500,14 +501,15 @@ frame = frame.union(box(tx0, CH_CY - 5, tz, tx0 + TRAY_X, CH_CY + 5, tz + 1)) \
     .union(box(CH_CX - 5, ty0, tz, CH_CX + 5, ty0 + TRAY_Y, tz + 1))
 for x in PIN_X:
     frame = frame.cut(cyl("z", (x, CH_CY), 2.8, tz - 1, tz + 2))
-add("T03_tray_frame_Al_angle", frame, C_AL, "알루미늄 앵글 10×10×1 + 평철 10×1", "재단+리벳",
-    note=f"외곽 {TRAY_X}×{TRAY_Y:.0f}, 십자 평철. 모서리·교차점 리벳")
+add("T03_tray_frame_Al_angle", frame, C_AL, "알루미늄 앵글 10×10×1 + 1T 띠 10폭", "재단+리벳",
+    note=f"외곽 {TRAY_X}×{TRAY_Y:.0f}. 앵글: 긴 변 {TRAY_X} ×2, 짧은 변 {TRAY_Y - 20:.0f} ×2 (긴 변 사이 맞대기, 45° 맞춤 아님) + 모서리 판 1T 20×20 ×4 리벳. "
+         f"십자 띠(1T 10폭, 업체 절단): {TRAY_X - 2} ×1, {TRAY_Y - 2:.0f} ×1 — 세운 다리 사이, 바닥 다리 위에 리벳. 교차점은 한 띠가 위로")
 cp = box(CH_CX - 55, CH_CY - 25, tz + 1, CH_CX + 55, CH_CY + 25, tz + 2)
 for x in PIN_X:
     cp = cp.cut(cyl("z", (x, CH_CY), 2.8, tz, tz + 3))
 add("T04_tray_center_plate_Al1T_110x50", cp, C_AL, "알루미늄 1T", "재단", note="십자 평철 위에 리벳, 받침판 핀 구멍 Ø5.6")
 add("T02_tray_mesh_SS", box(tx0 + 1, ty0 + 1, tz + 10, tx0 + TRAY_X - 1, ty0 + TRAY_Y - 1, tz + 10.6),
-    (0.8, 0.8, 0.82, 0.5), "스테인리스 메시", "재단", note="식품용 SUS304, 프레임 윗면에 결속")
+    (0.8, 0.8, 0.82, 0.5), "스테인리스 메시", "재단", note="식품용 SUS304, 프레임 윗면에 리벳 Ø3.2 + 와셔, 약 50mm 간격 (위치는 조립 때 겹쳐 뚫기)")
 
 # 트레이 옆 틈막이 (좌우 12mm 틈 → 2mm)
 for side in ("L", "R"):
@@ -573,14 +575,15 @@ door_x0, door_x1 = 2, OUT - 2
 door_z0, door_z1 = DOOR_Z0 - 10, DOOR_Z1 + 10
 door = box(door_x0, -(WALL + GAP), door_z0, door_x1, -GAP, door_z1)
 for mz in MAG_Z:
-    door = door.cut(cyl("y", (MAG_X, mz), MAG_D / 2, -GAP - 3, -GAP + 1))
+    door = door.cut(cyl("y", (MAG_X, mz), MAG_D / 2, -GAP - MAG["t"], -GAP + 1))
 for z0 in HINGE_Z:
     for p in hinge_hole_pts(z0):
         door = door.cut(cyl("y", p, 1.7, -(WALL + GAP) - 1, -GAP + 1))
 HANDLE_X = 268
-HANDLE_Z = ((DOOR_Z0 + DOOR_Z1) / 2 - 48, (DOOR_Z0 + DOOR_Z1) / 2 + 48)   # 간격 96
+HANDLE = PARAMS["HANDLE"]
+HANDLE_Z = tuple((DOOR_Z0 + DOOR_Z1) / 2 + s * HANDLE["hole_sp"] / 2 for s in (-1, 1))   # 구멍 간격 (params.yaml)
 for z in HANDLE_Z:
-    door = door.cut(cyl("y", (HANDLE_X, z), 2.25, -(WALL + GAP) - 1, -GAP + 1))
+    door = door.cut(cyl("y", (HANDLE_X, z), HANDLE["hole_d"] / 2, -(WALL + GAP) - 1, -GAP + 1))
 add("D01_door_outer_foamex5T", door, C_FOAMEX, "포맥스 5T", "재단", note="296 폭 (v3.0 손잡이 턱 삭제)")
 plug = box(DOOR_X0 + 1.5, -GAP, DOOR_Z0 + 1.5, DOOR_X1 - 1.5, IN0 - 2, DOOR_Z1 - 1.5)
 for z in HANDLE_Z:
@@ -736,12 +739,13 @@ for i, p in enumerate(th95_holes):
 for i, p in enumerate(FAN_HOLES):
     bolt(f"H_fan_bolt_{i}", "y", p, PART_Y1, -1, 30, spec="M3×30 냄비머리 볼트 (칸막이+팬+덕트 플랜지)")
     nut(f"H_fan_nut_{i}", "y", p, fl_y, -1)
-# 덕트 받침 (알루미늄 앵글 2개, 스탠드오프 10)
+# 덕트 받침 (알루미늄 1T L자 접기 2개, 스탠드오프 10)
 SAD_X = (45, 105)
 for i, x in enumerate(SAD_X):
     sd = box(x - 0.5, 150, IN0 + T05, x + 0.5, 180, H_Z0).union(box(x - 0.5, 150, IN0 + T05, x + 10, 180, IN0 + T05 + 1))
     sd = sd.cut(cyl("z", (x + 5, 165), 1.7, 0, 30))
-    add(f"H08_duct_saddle_{i+1}_Al", sd, C_AL, "알루미늄 앵글 10×10×1", "재단", note=f"세운 다리 높이 {H_Z0 - IN0 - T05:.1f}, 덕트 바닥에 리벳")
+    add(f"H08_duct_saddle_{i+1}_Al", sd, C_AL, "알루미늄 1T 판 L자 접기", "재단+절곡",
+        note=f"세운 다리 {H_Z0 - IN0 - T05:.1f} × 바닥 다리 10.5 (바깥 치수), 길이 30. 10×10 앵글로는 안 됨. 덕트 바닥에 리벳")
     so(f"H08_so_{i}", x + 5, 165, 10)
     bolt(f"H08_bolt_{i}", "z", (x + 5, 165), IN0 + T05 + 1, -1, 6, spec="M3×6 냄비머리 볼트 (덕트 받침)")
 
@@ -816,8 +820,9 @@ kb = kb.cut(box(K_USB[0] - USBP["plug_w"] / 2, OUT - WALL + 1, K_USB[1] - USBP["
 K_USB_HOLES = [(K_USB[0] - USB_HOLE_SP / 2, K_USB[1]), (K_USB[0] + USB_HOLE_SP / 2, K_USB[1])]
 for p in K_USB_HOLES:
     kb = kb.cut(cyl("y", p, 1.6, OUT - WALL - 1, OUT + 1))
-kb = kb.cut(box(K_SW[0] - 9.6, OUT - WALL - 1, K_SW[1] - 6.45, K_SW[0] + 9.6, OUT + 1, K_SW[1] + 6.45))
-kb = kb.cut(box(K_SW[0] - 12.5, OUT - WALL - 1, K_SW[1] - 9, K_SW[0] + 12.5, OUT - 1, K_SW[1] + 9))
+RK = PARAMS["ROCKER"]
+kb = kb.cut(box(K_SW[0] - RK["cut_w"] / 2, OUT - WALL - 1, K_SW[1] - RK["cut_h"] / 2, K_SW[0] + RK["cut_w"] / 2, OUT + 1, K_SW[1] + RK["cut_h"] / 2))
+kb = kb.cut(box(K_SW[0] - RK["bezel_w"] / 2, OUT - WALL - 1, K_SW[1] - RK["bezel_h"] / 2, K_SW[0] + RK["bezel_w"] / 2, OUT - 1, K_SW[1] + RK["bezel_h"] / 2))
 add("K02_sidebox_back_foamex5T", kb, C_FOAMEX, "포맥스 5T", "재단", note="전원 PG7, 로커(안쪽 카운터보어), USB")
 
 def vents(p_, z0, z1):
