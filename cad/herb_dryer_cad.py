@@ -760,12 +760,14 @@ add("H11_heater_duct_end_Al1T", endp, C_AL, "알루미늄 1T", "재단+절곡",
 WIN = (PTC_CX - PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] - PTC["fin_h"]) / 2, PTC_CX + PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] + PTC["fin_h"]) / 2)
 PTC_HOLES = [(PTC_CX + sx * PTC["mount_px"] / 2, FAN_C[1] + sz * PTC["mount_pz"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
 win = box(IX0, PTC_Y1, IZ0, IX1, PTC_Y1 + 1, IZ1).cut(box(WIN[0], PTC_Y1 - 1, WIN[1], WIN[2], PTC_Y1 + 2, WIN[3]))
+win_fl = box(IX0, PTC_Y1 + 1, IZ0, IX0 + 1, PTC_Y1 + FLG, IZ1).union(box(IX1 - 1, PTC_Y1 + 1, IZ0, IX1, PTC_Y1 + FLG, IZ1))
+H09_VENDOR = win.union(win_fl)                  # v3.3.1: 업체용 = 장착 구멍 없음 (PTC 받은 뒤 대고 직접 뚫기)
 for p in PTC_HOLES:
     win = win.cut(cyl("y", p, 1.7, PTC_Y1 - 1, PTC_Y1 + 2))
-win = win.union(box(IX0, PTC_Y1 + 1, IZ0, IX0 + 1, PTC_Y1 + FLG, IZ1)).union(box(IX1 - 1, PTC_Y1 + 1, IZ0, IX1, PTC_Y1 + FLG, IZ1))
+win = win.union(win_fl)
 add("H09_ptc_window_plate_Al1T", win, C_AL, "알루미늄 1T", "재단+절곡",
     note=f"개구 {PTC['fin_l']:g}×{PTC['fin_h']:g} = PTC 핀 면 [가정], 장착 Ø3.4 ×4 피치 {PTC['mount_px']:g}×{PTC['mount_pz']:g}. "
-         f"날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩. PTC 실측 후 이 판만 확정. 판 둘레 틈은 알루미늄 테이프")
+         f"날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩. 장착 구멍 4개는 업체에 맡기지 않고 PTC를 대고 직접 뚫음 (v3.3.1). 판 둘레 틈은 알루미늄 테이프")
 # H03 PTC (받침대 2 + 핀): 장착 구멍은 공기 방향 관통 [가정]
 ptc = box(ptc_x0, PTC_Y0, PTC_Z0, PTC_X1, PTC_Y1, PTC_Z0 + PTC["h"])
 for p in PTC_HOLES:

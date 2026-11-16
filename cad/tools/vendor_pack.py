@@ -2,7 +2,7 @@
 
 python cad/tools/vendor_pack.py <cad.py> [출력폴더]
 
-묶음: foamex/ (포맥스), aluminum/ (알루미늄 1차), aluminum2/ (알루미늄 2차 = 히터 덕트, PTC 실측 후 발주)
+묶음: foamex/ (포맥스), aluminum/ (알루미늄 1차), aluminum2/ (알루미늄 2차 = 히터 덕트, 1차와 같이 발주 가능)
 
 결과 (출력폴더/foamex/, 출력폴더/aluminum/ 같은 형식):
   dxf/<판>.dxf       판마다 1개, 단위 mm, 1:1, AutoCAD 2000(R2000) 형식
@@ -413,9 +413,10 @@ ALUMINUM2 = dict(
         "치수는 접은 뒤 바깥 치수. 펼친 그림은 바깥 치수 합(굽힘 공제 전) — 전개는 업체 기준. 모두 90° 접기",
         "H06 몸통 0.5T ㄷ자(2번), H10 뚜껑 0.5T(2번), H09 PTC 창판 1T(2번), H11 끝판 1T(2번)",
         "리벳 구멍은 없음 (조립 때 겹쳐 뚫음). 공차 ±0.3mm, 버 제거, 부품 이름 표시",
-        "H09 창판의 개구·장착 구멍은 PTC 실측 후 확정 → 이 묶음은 PTC 도착·실측 뒤 발주",
+        "1차 묶음과 같이 발주해도 됨 (v3.3.1). H09 창판은 장착 구멍 없이 개구만 — 구멍 4개는 PTC를 받아 대고 직접 뚫음",
+        "H09 개구 56×28은 PTC 핀 면 [가정]: 크면 알루미늄 테이프로 막고, 작으면 줄로 넓힘",
     ],
-    footer="2차: PTC(jojoruby 12V 100W 98×32×26) 실측 → params.yaml PTC 값 고치고 다시 빌드한 묶음으로 발주",
+    footer="H09 장착 구멍(Ø3.4 ×4, 피치 86×24 가정)은 업체 가공에서 뺌 → 확인도면에 안 나옴. PTC 실물에 대고 표시 후 직접",
 )
 
 
@@ -459,10 +460,10 @@ def run_aluminum2(cad_module, outdir, version=""):
         Wp = pw + 2 * f
         return bent_multi(name, title, "알루미늄 1T", Wp, ph, [((f, 0), (f, ph)), ((f + pw, 0), (f + pw, ph))], hs, inn, finished, note)
     x0, z0, x1, z1 = H.WIN
-    items.append(plate("H09_ptc_window_plate_Al1T", "PTC 창판", [(x, z, 3.4) for x, z in H.PTC_HOLES],
+    items.append(plate("H09_ptc_window_plate_Al1T", "PTC 창판", [],      # v3.3.1: 장착 구멍은 직접
                        [("poly", [(x0, z0), (x1, z0), (x1, z1), (x0, z1)])],
                        f"plate {pw:.1f} x {ph:.1f}, flange {f} x2",
-                       f"개구 {x1 - x0:g}×{z1 - z0:g} + 장착 Ø3.4 ×4 [PTC 실측 후 확정]. 날개 {f} 2개 같은 쪽으로"))
+                       f"개구 {x1 - x0:g}×{z1 - z0:g} [PTC 핀 면 가정]. 장착 구멍 없음 (PTC 대고 직접). 날개 {f} 2개 같은 쪽으로"))
     items.append(plate("H11_heater_duct_end_Al1T", "히터 덕트 끝판 (팬 쪽)", [(x, z, 3.4) for x, z in H.FAN_HOLES],
                        [("circle", H.FAN_C, 28.5)], f"plate {pw:.1f} x {ph:.1f}, flange {f} x2",
                        f"팬 Ø57 + Ø3.4 ×4. 날개 {f} 2개 같은 쪽으로"))
@@ -471,6 +472,7 @@ def run_aluminum2(cad_module, outdir, version=""):
     os.makedirs(os.path.join(out, "step"))
     import cadquery as cq
     shapes = {p["name"]: p["shape"] for p in H.PARTS}
+    shapes["H09_ptc_window_plate_Al1T"] = H.H09_VENDOR
     for it in items:
         cq.exporters.export(shapes[it["name"]], os.path.join(out, "step", it["name"] + ".step"))
     check_laser(items, out)
