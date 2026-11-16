@@ -71,7 +71,7 @@ ALUMINUM = dict(
     key="aluminum", title="알루미늄 1차",
     material="알루미늄 판 (업체 기본 재질), 0.5T·1T",
     groups=[
-        (("A01", "A02", "A03", "A04", "A06", "A07", "D03"), "outer", "0.5T 외곽만"),
+        (("A01", "A02", "A03", "A04", "A06", "A07", "D03"), "all", "0.5T 외곽+구멍"),
         (("A10", "A11", "A15", "A16", "T04"), "all", "1T 외곽+구멍"),
     ],
     spare={"A04_liner_ch_L": 1},
@@ -81,12 +81,14 @@ ALUMINUM = dict(
         "치수는 완성 치수. 공차 ±0.3mm, 모서리 버(burr) 제거",
         "DXF: dxf/ = AutoCAD 2000 형식, dxf_R12/ = R12 형식 (같은 내용). 단위 mm, 1:1",
         "CUT_OUTER = 외곽, CUT_INNER = 안쪽 개구부, DRILL = 구멍, BEND = 접는 선, NOTE = 글자 — 가공하지 마세요",
-        "0.5T 라이너는 외곽만 (작은 구멍은 저희가 직접). 1T 타공판 A10은 Ø4·Ø5 구멍 전부 (레이저)",
+        "0.5T 라이너도 외곽 + 구멍 (M3 Ø4.0, 케이블 Ø12, A03_back 흡기 개구 50×50). 1T 타공판 A10은 Ø4·Ø5 구멍 전부 (레이저)",
         "절곡 부품(H08 ×2, A12): 도면 치수는 접은 뒤 바깥 치수입니다. DXF의 펼친 그림은 바깥 치수 합(공제 전)이라 "
         "전개 치수는 업체 기준으로 계산해 주세요. 90° 한 번 접기. STEP 첨부",
+        "앵글 대신 1T L자 절곡 13개('1T 절곡 (앵글 대신)'): 견적 비교용입니다. 비싸면 이 묶음만 빼 주세요 (저희가 앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
+        "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요",
         "판마다 연필로 판 이름을 적어 주세요",
     ],
-    footer="여분: A04 라이너 1장 (L·R 외곽 같음). T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음)",
+    footer="여분: A04_L 라이너 1장. T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음). 앵글 대신 절곡 묶음은 견적 비교용",
 )
 
 
@@ -151,7 +153,7 @@ def rect_poly(W, H): return ("poly", [(0, 0), (W, 0), (W, H), (0, H)], None)
 
 
 def check_items(items):
-    """외곽이 있는지, 구멍·개구부가 외곽 상자 안에 있는지"""
+    """외곽이 있는지, 구멍·개구부가 외곽 상자 안에 있는지, 원 구멍~모서리 살"""
     bad = []
     for it in items:
         if not it["outer"]:
@@ -165,8 +167,25 @@ def check_items(items):
                 gxs = [q[0] for q in g[1]]; gys = [q[1] for q in g[1]]; gx0, gx1, gy0, gy1 = min(gxs), max(gxs), min(gys), max(gys)
             if gx0 < x0 - 0.01 or gx1 > x1 + 0.01 or gy0 < y0 - 0.01 or gy1 > y1 + 0.01:
                 bad.append(f"{it['name']}: 구멍이 판 밖 ({gx0:.1f},{gy0:.1f})")
+        # 구멍~판 모서리 살 (얇으면 찢어짐). 1.5mm 미만은 실패, 3mm 미만은 경고
+        for o in it["outer"]:
+            pts = o[1]; segs = list(zip(pts, pts[1:] + pts[:1]))
+            for g in it["inner"] + it["drill"]:
+                if g[0] != "circle": continue
+                (cx, cy), r = g[1], g[2]
+                m = min(seg_dist((cx, cy), a, b) for a, b in segs) - r
+                if m < 1.5: bad.append(f"{it['name']}: Ø{2 * r:.1f} 구멍이 판 모서리에서 {m:.1f}mm")
+                elif m < 3.0: print(f"  [경고] {it['name']}: Ø{2 * r:.1f} 구멍~모서리 {m:.1f}mm")
     if bad:
         raise SystemExit("발주 묶음 검사 실패:\n  " + "\n  ".join(bad))
+
+
+def seg_dist(p, a, b):
+    (px, py), (ax, ay), (bx, by) = p, a, b
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+    return ((px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2) ** 0.5
 
 
 def items_from_parts(cad_module, pk):
@@ -235,7 +254,8 @@ def run_aluminum(cad_module, outdir, version=""):
     tx, ty = H.TRAY_X, H.TRAY_Y
     pk["extra"] = [
         dict(name=f"T03_tray_cross_strip_X_Al1T_10x{tx - 2:g}", title="트레이 십자 띠 (가로)", W=float(tx - 2), H=10.0, qty=1,
-             group="1T 띠·조각", mat="알루미늄 1T", note="T03 프레임 세운 다리 사이, 바닥 다리 위에 리벳"),
+             group="1T 띠·조각", mat="알루미늄 1T", mode="all", note="T03 프레임 세운 다리 사이, 바닥 다리 위에 리벳. 받침 핀 구멍 Ø5.6 ×2",
+             drill=[("circle", (px - (H.CH_CX - tx / 2 + 1), 5.0), 2.8, None) for px in H.PIN_X]),
         dict(name=f"T03_tray_cross_strip_Y_Al1T_10x{ty - 2:g}", title="트레이 십자 띠 (세로)", W=round(ty - 2, 2), H=10.0, qty=1,
              group="1T 띠·조각", mat="알루미늄 1T", note="가로 띠 위로 교차"),
         dict(name="T03_tray_corner_plate_Al1T_20x20", title="트레이 모서리 판", W=20.0, H=20.0, qty=4,
@@ -252,6 +272,28 @@ def run_aluminum(cad_module, outdir, version=""):
     items.append(bent_item("A12_outlet_baffle_Al1T_bent", "출구 배플", 64.0, fl + hv, fl,
                            [(12.0, 6.0, 3.4), (52.0, 6.0, 3.4)], f"plate {hv:.1f} x flange {fl} x W64", 1,
                            f"플랜지 {fl} (구멍 Ø3.4 ×2, 플랜지 끝에서 6, 옆 끝에서 12) + 세운 판 {hv:.1f}, 폭 64"))
+    # v3.2.0: 앵글 13조각을 1T L자 절곡으로도 (견적 비교용). 펼침 폭 20 = 바깥 10 + 10, 아래 다리 0~10 / 위 다리 10~20
+    d0 = (H.FLOOR_Z + 1)                                  # A19 아래 끝
+    strip0 = H.IN0 + H.T05 + 2 + 5                        # A14 앞 끝 (ty0 + 5)
+    ang = [  # (이름, 제목, 길이, 수량, 구멍[(x, 다리)], 메모)
+        ("A17_floor_angle_F", "바닥 받침 앞", 269.0, 1, [], "라이너에 중성 실리콘"),
+        ("A17_floor_angle_LR", "바닥 받침 좌·우", 214.5, 2, [], "라이너에 중성 실리콘"),
+        ("A17_floor_angle_LB_RB", "바닥 받침 뒤 조각", 12.5, 2, [], "짧아서 어려우면 제외"),
+        ("A20_duct_floor_angle", "덕트 벽 아래 받침", 247.0, 1, [], "A16에 리벳 (겹쳐 뚫기)"),
+        ("T03_frame_long", "트레이 프레임 긴 변", float(H.TRAY_X), 2, [], "맞대기 + 모서리 판 리벳"),
+        ("T03_frame_short", "트레이 프레임 짧은 변", round(H.TRAY_Y - 20, 2), 2, [], "긴 변 사이 맞대기"),
+        ("A14_tray_gap_strip", "트레이 옆 틈막이", 229.0, 2, [(y - strip0, "wall") for y in H.STRIP_BOLTS_Y],
+         "벽 다리 구멍 = 앞 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
+        ("A19_duct_wall_angle", "덕트 벽 세로 받침", round(H.DUCT_TOP - d0, 2), 2, [(z - d0, "wall") for z in H.DUCTANG_Z],
+         "벽 다리 구멍 = 아래 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
+        ("A18_partition_angle", "칸막이 받침", 20.0, 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
+    ]
+    for nm, title, L, q, holes, note in ang:
+        hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
+        it = bent_item(f"{nm}_Al1T_L10x10_{L:g}", title, L, 20.0, 10.0, hs, f"L 10x10 (outside) x {L:g}", q,
+                       f"앵글 10×10×1 대신 1T 절곡. {note}. 구멍 다리: 아래 반쪽(0~10) = 바닥/첫 다리, 위 반쪽(10~20) = 벽 다리")
+        it["group"] = "1T 절곡 (앵글 대신)"
+        items.append(it)
     out = os.path.join(str(outdir), "aluminum")
     write_package(items, pk, out, version)
     os.makedirs(os.path.join(out, "step"))

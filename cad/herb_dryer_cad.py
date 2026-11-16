@@ -1,11 +1,12 @@
 """
-허브 건조기 v3.1 — 제작용 CadQuery 모델 (버전별 변경은 CHANGELOG.md)
+허브 건조기 v3.2 — 제작용 CadQuery 모델 (버전별 변경은 CHANGELOG.md)
 좌표: X=폭(좌→우), Y=깊이(앞=0 → 뒤=300), Z=높이(바닥=0). 단위 mm.
 
 v3.0 (메이저): 회로를 본체 오른쪽 측면 박스(K)로 분리, 공기 경로는 알루미늄·스테인리스·팬·PTC·센서만.
 펠티어(2차) 완전 제외, 덕트 깊이 20, 칸막이·덕트 벽·히터 덕트 알루미늄화, 흡기를 뒷판(복귀실)으로.
 v3.1: TCS34725·LED·천장 센서 인서트·부저 삭제, 전장부 관통구를 PG9 전력/신호 2개로 분리,
 흡기: 활성탄을 뒷판 바깥 커버(차가운 쪽)로, BME688 #2를 관 옆벽 홈(흐름과 나란히), 출구-칸막이 20mm.
+v3.2: 트레이 메시를 바닥 다리·십자 띠 위로, 라이너 구멍 업체 가공(M3 Ø4.0, 케이블 Ø12 + 실리콘 그로밋).
 
 v2.8 → v2.9 주요 변경
 - 순환 구조: 덕트 벽을 전장부 바닥까지 내려 '플레넘(앞)'과 '복귀실(뒤)'로 분리.
@@ -337,24 +338,28 @@ for (x, y) in TOP_SCREWS:
 # 4. 알루미늄 라이너 0.5T
 # ============================================================
 z_ch0 = FLOOR_TOP + LINER_GAP          # 83
+LINER = PARAMS["LINER"]
+LB_R = LINER["bolt_d"] / 2             # 라이너 M3 구멍 (v3.2.0 Ø4.0)
+LC_R = LINER["cable_d"] / 2            # 라이너 케이블 구멍 + 실리콘 그로밋 (v3.2.0 Ø12)
+PT1P_LINER = (PT1P[0] + 4, PT1P[1])    # Ø12면 앞 모서리까지 1mm라 라이너 구멍만 뒤로 4 (폼 구멍 Ø28 안, 모서리 5mm)
 liners = {}
 liners["A01_liner_bay_bottom_270x270"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05).cut(cyl("z", DRAIN, 4, 0, 20))
 liners["A02_liner_bay_L_270x64.5"] = box(IN0, IN0, IN0 + T05, IN0 + T05, IN1, FLOOR_Z)
-liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P, 5, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, 5, IN1 - 2, IN1 + 1))
+liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P_LINER, LC_R, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, LC_R, IN1 - 2, IN1 + 1))
 liners["A03_liner_bay_front_269x64.5"] = box(IN0 + T05, IN0, IN0 + T05, IN1 - T05, IN0 + T05, FLOOR_Z)   # v3.0 복구
 liners["A03_liner_bay_back_269x64.5"] = box(IN0 + T05, IN1 - T05, IN0 + T05, IN1 - T05, IN1, FLOOR_Z) \
     .cut(box(INTAKE_C[0] - 25, IN1 - 2, INTAKE_C[1] - 25, INTAKE_C[0] + 25, IN1 + 1, INTAKE_C[1] + 25))
 def ch_side(x0, x1, right):
     l = box(x0, IN0, z_ch0, x1, IN1, LID_Z - T05)
     for y in STRIP_BOLTS_Y:
-        l = l.cut(cyl("x", (y, STRIP_Z - 5), 1.7, x0 - 1, x1 + 1))
+        l = l.cut(cyl("x", (y, STRIP_Z - 5), LB_R, x0 - 1, x1 + 1))
     for z in DUCTANG_Z:
-        l = l.cut(cyl("x", (DUCTANG_Y, z), 1.7, x0 - 1, x1 + 1))
+        l = l.cut(cyl("x", (DUCTANG_Y, z), LB_R, x0 - 1, x1 + 1))
     if right:
         for p in (PT3, PT4):
-            l = l.cut(cyl("x", p, 5, x0 - 1, x1 + 1))
+            l = l.cut(cyl("x", p, LC_R, x0 - 1, x1 + 1))
         for p in (SHT_P, BME1_P):
-            l = l.cut(cyl("x", p, 1.7, x0 - 1, x1 + 1))
+            l = l.cut(cyl("x", p, LB_R, x0 - 1, x1 + 1))
     return l
 liners["A04_liner_ch_L_270x171.5"] = ch_side(IN0, IN0 + T05, False)
 liners["A04_liner_ch_R_270x171.5"] = ch_side(IN1 - T05, IN1, True)
@@ -480,14 +485,15 @@ for i, p in enumerate(lc_tray_holes):
     bolt(f"L_bolt_tray_{i}", "z", p, tz0 + blk_h2 - 4, -1, 30, d=4, head="flat",
          spec="M4×30 볼트 (로드셀, 머리 묻힘) [실측: M4/M5]")
 sz0 = tz0 + blk_h2
-add("A11_loadcell_shield_Al1T_100x40", box(CH_CX - 50, CH_CY - 20, sz0, CH_CX + 50, CH_CY + 20, sz0 + 1), C_AL, "알루미늄 1T", "재단")
+add("A11_loadcell_shield_Al1T_100x40", box(CH_CX - 50, CH_CY - 20, sz0, CH_CX + 50, CH_CY + 20, sz0 + 1), C_AL, "알루미늄 1T", "재단",
+    note="L04와 함께 트레이 블록 윗면에 중성 실리콘으로 접착 (PVC 본드·순간접착제 금지)")
 hub_z0 = sz0 + 1
 PIN_X = (CH_CX - 40, CH_CX + 40)
 hub = box(CH_CX - 50, CH_CY - 20, hub_z0, CH_CX + 50, CH_CY + 20, hub_z0 + 4)
 for x in PIN_X:
     hub = hub.union(cyl("z", (x, CH_CY), 2.5, hub_z0 + 4, hub_z0 + 8))
 add("L04_tray_platform_PETG_100x40", hub, C_PETG, "PETG", "3D프린트",
-    note="차폐판과 함께 트레이 블록 윗면에 접착. 위치 핀 Ø5 2개")
+    note="차폐판 A11과 함께 트레이 블록 윗면에 중성 실리콘으로 접착. 위치 핀 Ø5 2개")
 assert abs(hub_z0 + 4 - LC_TOP) < 1e-6
 
 TRAY_X = 245                                   # 문 개구부 260 때문에 고정
@@ -508,8 +514,14 @@ cp = box(CH_CX - 55, CH_CY - 25, tz + 1, CH_CX + 55, CH_CY + 25, tz + 2)
 for x in PIN_X:
     cp = cp.cut(cyl("z", (x, CH_CY), 2.8, tz, tz + 3))
 add("T04_tray_center_plate_Al1T_110x50", cp, C_AL, "알루미늄 1T", "재단", note="십자 평철 위에 리벳, 받침판 핀 구멍 Ø5.6")
-add("T02_tray_mesh_SS", box(tx0 + 1, ty0 + 1, tz + 10, tx0 + TRAY_X - 1, ty0 + TRAY_Y - 1, tz + 10.6),
-    (0.8, 0.8, 0.82, 0.5), "스테인리스 메시", "재단", note="식품용 SUS304, 프레임 윗면에 리벳 Ø3.2 + 와셔, 약 50mm 간격 (위치는 조립 때 겹쳐 뚫기)")
+# v3.2.0: 메시를 세운 다리 윗단(받침면 없음) → 바닥 다리·십자 띠·T04 위로. 세운 다리 남는 높이 = 트레이 테두리
+MESH_Z = tz + 2
+mesh = box(tx0 + 1, ty0 + 1, MESH_Z, tx0 + TRAY_X - 1, ty0 + TRAY_Y - 1, MESH_Z + 0.6)
+for x in PIN_X:
+    mesh = mesh.cut(cyl("z", (x, CH_CY), 3.0, MESH_Z - 1, MESH_Z + 2))
+add("T02_tray_mesh_SS", mesh, (0.8, 0.8, 0.82, 0.5), "스테인리스 메시", "재단",
+    note=f"식품용 SUS304 {TRAY_X - 2}×{TRAY_Y - 2:.0f}, 바닥 다리·십자 띠·T04 위에 얹고 위에서 와셔 + 리벳 Ø3.2, 둘레 약 50mm 간격 "
+         f"(위치는 조립 때 겹쳐 뚫기). 받침 핀 자리 Ø6 구멍 2. 세운 다리가 메시 위로 {tz + 10 - MESH_Z - 0.6:.1f}mm 테두리. v3.1.2보다 잎 높이 8mm 낮음")
 
 # 트레이 옆 틈막이 (좌우 12mm 틈 → 2mm)
 for side in ("L", "R"):
@@ -1006,7 +1018,7 @@ def recut(name, tool):
             p["shape"] = p["shape"].cut(tool)
 for (x, y_, L) in SO_HOLES:
     recut("F01_foam_bottom_270x270", cyl("z", (x, y_), 4, 0, 20))
-    recut("A01_liner_bay_bottom_270x270", cyl("z", (x, y_), 3.5 if L > 11 else 1.7, 0, 20))
+    recut("A01_liner_bay_bottom_270x270", cyl("z", (x, y_), 3.5 if L > 11 else LB_R, 0, 20))
 add("P07_top_plate_foamex5T", top_saved, C_FOAMEX, "포맥스 5T", "재단")
 SO_TOP = SO_Z + 20
 
