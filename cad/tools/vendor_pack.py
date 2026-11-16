@@ -153,7 +153,7 @@ def rect_poly(W, H): return ("poly", [(0, 0), (W, 0), (W, H), (0, H)], None)
 
 
 def check_items(items):
-    """외곽이 있는지, 구멍·개구부가 외곽 상자 안에 있는지"""
+    """외곽이 있는지, 구멍·개구부가 외곽 상자 안에 있는지, 원 구멍~모서리 살"""
     bad = []
     for it in items:
         if not it["outer"]:
@@ -167,8 +167,25 @@ def check_items(items):
                 gxs = [q[0] for q in g[1]]; gys = [q[1] for q in g[1]]; gx0, gx1, gy0, gy1 = min(gxs), max(gxs), min(gys), max(gys)
             if gx0 < x0 - 0.01 or gx1 > x1 + 0.01 or gy0 < y0 - 0.01 or gy1 > y1 + 0.01:
                 bad.append(f"{it['name']}: 구멍이 판 밖 ({gx0:.1f},{gy0:.1f})")
+        # 구멍~판 모서리 살 (얇으면 찢어짐). 1.5mm 미만은 실패, 3mm 미만은 경고
+        for o in it["outer"]:
+            pts = o[1]; segs = list(zip(pts, pts[1:] + pts[:1]))
+            for g in it["inner"] + it["drill"]:
+                if g[0] != "circle": continue
+                (cx, cy), r = g[1], g[2]
+                m = min(seg_dist((cx, cy), a, b) for a, b in segs) - r
+                if m < 1.5: bad.append(f"{it['name']}: Ø{2 * r:.1f} 구멍이 판 모서리에서 {m:.1f}mm")
+                elif m < 3.0: print(f"  [경고] {it['name']}: Ø{2 * r:.1f} 구멍~모서리 {m:.1f}mm")
     if bad:
         raise SystemExit("발주 묶음 검사 실패:\n  " + "\n  ".join(bad))
+
+
+def seg_dist(p, a, b):
+    (px, py), (ax, ay), (bx, by) = p, a, b
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / L2))
+    return ((px - ax - t * dx) ** 2 + (py - ay - t * dy) ** 2) ** 0.5
 
 
 def items_from_parts(cad_module, pk):

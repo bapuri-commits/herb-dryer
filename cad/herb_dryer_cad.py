@@ -341,10 +341,11 @@ z_ch0 = FLOOR_TOP + LINER_GAP          # 83
 LINER = PARAMS["LINER"]
 LB_R = LINER["bolt_d"] / 2             # 라이너 M3 구멍 (v3.2.0 Ø4.0)
 LC_R = LINER["cable_d"] / 2            # 라이너 케이블 구멍 + 실리콘 그로밋 (v3.2.0 Ø12)
+PT1P_LINER = (PT1P[0] + 4, PT1P[1])    # Ø12면 앞 모서리까지 1mm라 라이너 구멍만 뒤로 4 (폼 구멍 Ø28 안, 모서리 5mm)
 liners = {}
 liners["A01_liner_bay_bottom_270x270"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05).cut(cyl("z", DRAIN, 4, 0, 20))
 liners["A02_liner_bay_L_270x64.5"] = box(IN0, IN0, IN0 + T05, IN0 + T05, IN1, FLOOR_Z)
-liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P, LC_R, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, LC_R, IN1 - 2, IN1 + 1))
+liners["A02_liner_bay_R_270x64.5"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P_LINER, LC_R, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, LC_R, IN1 - 2, IN1 + 1))
 liners["A03_liner_bay_front_269x64.5"] = box(IN0 + T05, IN0, IN0 + T05, IN1 - T05, IN0 + T05, FLOOR_Z)   # v3.0 복구
 liners["A03_liner_bay_back_269x64.5"] = box(IN0 + T05, IN1 - T05, IN0 + T05, IN1 - T05, IN1, FLOOR_Z) \
     .cut(box(INTAKE_C[0] - 25, IN1 - 2, INTAKE_C[1] - 25, INTAKE_C[0] + 25, IN1 + 1, INTAKE_C[1] + 25))
