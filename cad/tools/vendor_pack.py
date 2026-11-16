@@ -8,9 +8,12 @@ python cad/tools/vendor_pack.py <cad.py> [출력폴더]
   */all_panels.dxf   모든 판을 한 장에 늘어놓은 것 (견적용, 배치는 업체가)
   발주표.xlsx        판·재료·크기·수량·가공·구멍 수, 업체 전달 사항
   확인도면.pdf       판마다 1쪽 (외곽 치수, 구멍 ID·좌표표). 절곡 부품은 펼친 그림 + 접은 뒤 치수
-  step/              (알루미늄만) 절곡 부품 3D (meviy 등 3D 견적용)
+  step/              (알루미늄만) 절곡 부품 3D (H08·A12 + 앵글 대용 L자 9종)
+  dxf_laser/         (알루미늄만) 레이저 업체 색 규칙판, 평판만 (v3.2.1)
+                     외곽 OUTER_CUT ACI 5 파랑, 구멍·개구 INNER_CUT ACI 2 노랑, 소재크기 MATERIAL ACI 6 자홍
+                     글자·접는 선 없음, 빨강(ACI 1 = 업체 규칙상 각인) 안 씀. 절곡 부품은 step/ 만 올린다
 
-레이어
+레이어 (dxf/, dxf_R12/ — 사람이 보는 용도)
   CUT_OUTER   외곽 절단
   CUT_INNER   안쪽 개구부 절단 (사각 구멍, Ø8 넘는 원)
   DRILL       드릴 구멍 (Ø8 이하 원)
@@ -20,7 +23,7 @@ python cad/tools/vendor_pack.py <cad.py> [출력폴더]
 포켓·접시머리 자리는 넣지 않음 (직접 가공).
 면적 1cm² 미만의 외곽 조각(구멍이 판 모서리를 깎고 남은 부스러기)은 뺀다.
 """
-import os, sys, json, shutil, importlib.util
+import os, re, sys, json, shutil, importlib.util
 from collections import Counter
 import ezdxf, logging
 logging.getLogger("ezdxf").setLevel(logging.ERROR)   # R12 단위 경고 숨김
@@ -79,12 +82,13 @@ ALUMINUM = dict(
     notes=[
         "재료: 알루미늄 판 (재질은 업체 기본), 0.5T와 1T. 0.5T는 손으로 접을 수 있는 무른 판이면 좋겠습니다",
         "치수는 완성 치수. 공차 ±0.3mm, 모서리 버(burr) 제거",
-        "DXF: dxf/ = AutoCAD 2000 형식, dxf_R12/ = R12 형식 (같은 내용). 단위 mm, 1:1",
-        "CUT_OUTER = 외곽, CUT_INNER = 안쪽 개구부, DRILL = 구멍, BEND = 접는 선, NOTE = 글자 — 가공하지 마세요",
+        "업체에 올릴 파일 = 발주표 '올릴 파일' 열: 평판은 dxf_laser/ (외부 커팅 파랑 ACI 5, 내부 커팅 노랑 ACI 2, 소재크기 자홍 ACI 6), "
+        "접는 부품은 step/ (DXF는 올리지 않음). 단위 mm, 1:1, AutoCAD 2000",
+        "dxf/·dxf_R12/·확인도면.pdf는 확인용 (DRILL=빨강, BEND=파랑이라 업체 색 규칙과 다름 — 그대로 올리지 마세요)",
         "0.5T 라이너도 외곽 + 구멍 (M3 Ø4.0, 케이블 Ø12, A03_back 흡기 개구 50×50). 1T 타공판 A10은 Ø4·Ø5 구멍 전부 (레이저)",
         "절곡 부품(H08 ×2, A12): 도면 치수는 접은 뒤 바깥 치수입니다. DXF의 펼친 그림은 바깥 치수 합(공제 전)이라 "
-        "전개 치수는 업체 기준으로 계산해 주세요. 90° 한 번 접기. STEP 첨부",
-        "앵글 대신 1T L자 절곡 13개('1T 절곡 (앵글 대신)'): 견적 비교용입니다. 비싸면 이 묶음만 빼 주세요 (저희가 앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
+        "전개 치수는 업체 기준으로 계산해 주세요. 90° 한 번 접기. 견적은 STEP으로",
+        "앵글 대신 1T L자 절곡 13개('1T 절곡 (앵글 대신)', STEP 9종): 견적 비교용입니다. 비싸면 이 묶음만 빼 주세요 (저희가 앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
         "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요",
         "판마다 연필로 판 이름을 적어 주세요",
     ],
@@ -233,6 +237,95 @@ def write_package(items, pk, out, version):
               f"  inner {len(it['inner'])}  drill {drill_summary(it['drill'])}")
 
 
+# ---------------------------------------------------------------- 레이저 업체 색 규칙 (v3.2.1, 알루미늄)
+LASER_LAYERS = (("OUTER_CUT", 5), ("INNER_CUT", 2), ("MATERIAL", 6))   # 외부 커팅 / 내부 커팅 / 소재크기
+LASER_COLORS = {c for _, c in LASER_LAYERS}
+MATERIAL_MARGIN = 5.0
+
+
+def thick_of(it):
+    m = re.search(r"([0-9.]+)\s*T", it["mat"])
+    if not m: raise SystemExit(f"{it['name']}: 재료에서 두께를 못 읽음 ({it['mat']})")
+    return float(m.group(1))
+
+
+def write_laser(items, out):
+    """평판만 dxf_laser/<판>.dxf. 엔티티 색도 직접 지정 (BYLAYER 안 씀)"""
+    os.makedirs(os.path.join(out, "dxf_laser"))
+    for it in items:
+        if it.get("bend"): continue
+        doc = ezdxf.new("R2000"); doc.units = ezdxf.units.MM
+        for ln, col in LASER_LAYERS: doc.layers.add(ln, color=col)
+        ms = doc.modelspace()
+        A = lambda ln, col: {"layer": ln, "color": col}
+        for o in it["outer"]: ms.add_lwpolyline(o[1], close=True, dxfattribs=A("OUTER_CUT", 5))
+        for g in it["inner"] + it["drill"]:
+            if g[0] == "circle": ms.add_circle(g[1], g[2], dxfattribs=A("INNER_CUT", 2))
+            else: ms.add_lwpolyline(g[1], close=True, dxfattribs=A("INNER_CUT", 2))
+        xs = [q[0] for o in it["outer"] for q in o[1]]; ys = [q[1] for o in it["outer"] for q in o[1]]
+        m = MATERIAL_MARGIN
+        ms.add_lwpolyline([(min(xs) - m, min(ys) - m), (max(xs) + m, min(ys) - m), (max(xs) + m, max(ys) + m), (min(xs) - m, max(ys) + m)],
+                          close=True, dxfattribs=A("MATERIAL", 6))
+        doc.saveas(os.path.join(out, "dxf_laser", f"{it['name']}.dxf"))
+
+
+def check_laser(items, out):
+    """업체 규칙: 색 {2,5,6}만, 구멍 지름 ≥ 두께, 구멍 사이·구멍~모서리 간격 ≥ 두께"""
+    bad = []
+    for it in items:
+        t = thick_of(it)
+        if not it.get("bend"):
+            fn = os.path.join(out, "dxf_laser", f"{it['name']}.dxf")
+            doc = ezdxf.readfile(fn)
+            if doc.dxfversion != "AC1015": bad.append(f"{it['name']}: DXF 버전 {doc.dxfversion}")
+            for e in doc.modelspace():
+                col = e.dxf.color if e.dxf.hasattr("color") else 256
+                if col not in LASER_COLORS: bad.append(f"{it['name']}: {e.dxftype()} 색 {col} (레이어 {e.dxf.layer})")
+                if e.dxftype() not in ("LWPOLYLINE", "CIRCLE"): bad.append(f"{it['name']}: 엔티티 {e.dxftype()}")
+        circles = [g for g in it["inner"] + it["drill"] if g[0] == "circle"]
+        polys = [g for g in it["inner"] if g[0] == "poly"]
+        segs = [s for o in it["outer"] for s in zip(o[1], o[1][1:] + o[1][:1])] + \
+               [s for g in polys for s in zip(g[1], g[1][1:] + g[1][:1])]
+        for i, g in enumerate(circles):
+            (cx, cy), r = g[1], g[2]
+            if 2 * r < max(t, 1.0) - 1e-6: bad.append(f"{it['name']}: 구멍 Ø{2 * r:.1f} < 두께 {t}")
+            if segs:
+                m = min(seg_dist((cx, cy), a, b) for a, b in segs) - r
+                if m < t - 1e-6: bad.append(f"{it['name']}: Ø{2 * r:.1f} ({cx:.1f},{cy:.1f}) 모서리·개구까지 {m:.2f} < {t}")
+            for h in circles[i + 1:]:
+                gap = ((cx - h[1][0]) ** 2 + (cy - h[1][1]) ** 2) ** 0.5 - r - h[2]
+                if gap < t - 1e-6: bad.append(f"{it['name']}: 구멍 ({cx:.1f},{cy:.1f})~({h[1][0]:.1f},{h[1][1]:.1f}) 간격 {gap:.2f} < {t}")
+        for g in polys:   # 사각 개구~외곽 상자
+            ox = [q[0] for o in it["outer"] for q in o[1]]; oy = [q[1] for o in it["outer"] for q in o[1]]
+            gx = [q[0] for q in g[1]]; gy = [q[1] for q in g[1]]
+            m = min(min(gx) - min(ox), max(ox) - max(gx), min(gy) - min(oy), max(oy) - max(gy))
+            if m < t - 1e-6: bad.append(f"{it['name']}: 개구~모서리 {m:.2f} < {t}")
+    if bad:
+        raise SystemExit("레이저 업체 규칙 검사 실패:\n  " + "\n  ".join(bad))
+    n = sum(1 for it in items if not it.get("bend"))
+    print(f"레이저 규칙 검사 통과: dxf_laser {n}장 (색 {{2,5,6}}, 구멍 ≥ 두께, 간격 ≥ 두께), 절곡 {len(items) - n}종은 step/")
+
+
+def upload_file(it):
+    return f"step/{it['name']}.step" if it.get("bend") else f"dxf_laser/{it['name']}.dxf"
+
+
+def l_angle_step(it, fn):
+    """L 10×10 t1 (바깥 치수). 펼친 그림 y 0~10 = 바닥 다리, 10~20 = 세운 다리.
+    구멍 위치: 접는 선까지 거리 = 바깥 모서리에서 거리"""
+    import cadquery as cq
+    L = it["W"]
+    s = cq.Workplane("XY").box(L, 10, 1, centered=False).union(cq.Workplane("XY").box(L, 1, 10, centered=False))
+    for g in it["drill"]:
+        (x, y), r = g[1], g[2]
+        if y <= 10:   # 바닥 다리 (Z 방향 구멍), 모서리(y=0)에서 10 - y
+            s = s.cut(cq.Workplane("XY").circle(r).extrude(1).translate((x, 10 - y, 0)))
+        else:         # 세운 다리 (Y 방향 구멍), 모서리(z=0)에서 y - 10
+            s = s.cut(cq.Workplane("XZ").circle(r).extrude(-1).translate((x, 0, y - 10)))
+    cq.exporters.export(s, fn)
+    return s
+
+
 def run_foamex(cad_module, outdir, version=""):
     items = items_from_parts(cad_module, FOAMEX)
     write_package(items, FOAMEX, os.path.join(str(outdir), "foamex"), version)
@@ -296,11 +389,17 @@ def run_aluminum(cad_module, outdir, version=""):
         items.append(it)
     out = os.path.join(str(outdir), "aluminum")
     write_package(items, pk, out, version)
+    write_laser(items, out)
     os.makedirs(os.path.join(out, "step"))
     import cadquery as cq
-    for p in H.PARTS:
-        if p["name"] in ("H08_duct_saddle_1_Al", "A12_outlet_baffle_Al1T_64x56"):
-            cq.exporters.export(p["shape"], os.path.join(out, "step", p["name"] + ".step"))
+    src = {"H08_duct_saddle_Al1T_bent": "H08_duct_saddle_1_Al", "A12_outlet_baffle_Al1T_bent": "A12_outlet_baffle_Al1T_64x56"}
+    shapes = {p["name"]: p["shape"] for p in H.PARTS}
+    for it in items:
+        if not it.get("bend"): continue
+        fn = os.path.join(out, "step", it["name"] + ".step")
+        if it["name"] in src: cq.exporters.export(shapes[src[it["name"]]], fn)
+        else: l_angle_step(it, fn)
+    check_laser(items, out)
     a10 = next(it for it in items if it["name"].startswith("A10"))
     print("A10 구멍:", drill_summary(a10["drill"]))
     return items
@@ -395,7 +494,7 @@ def write_xlsx(items, pk, fn, version):
     for s in pk["notes"]:
         ws.cell(r, 1, "· " + s).font = F; r += 1
     r += 1
-    hdr = ["No", "판 (DXF 파일)", "이름", "재료", "가로 mm", "세로 mm", "수량", "가공", "안쪽 개구부", "드릴 구멍", "면적 ㎡(수량 포함)", "그림의 면 / 접은 뒤 치수"]
+    hdr = ["No", "판 (DXF 파일)", "이름", "재료", "가로 mm", "세로 mm", "수량", "가공", "안쪽 개구부", "드릴 구멍", "면적 ㎡(수량 포함)", "그림의 면 / 접은 뒤 치수"] + (["올릴 파일"] if pk["key"] == "aluminum" else [])
     for c, h in enumerate(hdr, 1):
         ws.cell(r, c, h).font = B; ws.cell(r, c).fill = PatternFill("solid", fgColor="FFD9D9D9")
     h0 = r + 1
@@ -405,12 +504,13 @@ def write_xlsx(items, pk, fn, version):
         for c, v in enumerate(vals, 1): ws.cell(r, c, v).font = F
         ws.cell(r, 11, f"=E{r}*F{r}*G{r}/1000000").font = F; ws.cell(r, 11).number_format = "0.000"
         ws.cell(r, 12, it.get("finished") or it["face"]).font = F
+        if pk["key"] == "aluminum": ws.cell(r, 13, upload_file(it)).font = F
     r += 1
     ws.cell(r, 6, "합계").font = B; ws.cell(r, 7, f"=SUM(G{h0}:G{r-1})").font = B
     ws.cell(r, 11, f"=SUM(K{h0}:K{r-1})").font = B; ws.cell(r, 11).number_format = "0.000"
     r += 2
     ws.cell(r, 1, pk["footer"]).font = F
-    for col, w in zip("ABCDEFGHIJKL", (5, 42, 20, 22, 9, 9, 6, 14, 11, 22, 16, 30)): ws.column_dimensions[col].width = w
+    for col, w in zip("ABCDEFGHIJKLM", (5, 42, 20, 22, 9, 9, 6, 14, 11, 22, 16, 30, 46)): ws.column_dimensions[col].width = w
     wb.save(fn)
 
 

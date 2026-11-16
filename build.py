@@ -9,7 +9,7 @@
   step      build/herb_dryer.step
   check     간섭 검사 → build/interference.txt   (1건이라도 있으면 빌드 실패, 1차↔2차 제외)
   drawings  build/drawings/ 구멍표 PDF, 1:1 인쇄 PDF, dxf/
-  vendor    build/vendor/{foamex,aluminum}/ 외주 발주 패키지 (DXF, 발주표, 확인도면, 알루미늄 절곡 STEP)
+  vendor    build/vendor/{foamex,aluminum}/ 외주 발주 패키지 (DXF, 발주표, 확인도면, 알루미늄 업체 색 규칙 dxf_laser + 절곡 STEP)
   stl       build/stl/ 3D 프린트 부품 STL (파일 이름에 버전)
   render    build/render/ 외관·내부·단면 PNG (실패해도 빌드는 계속)
   csv       build/fasteners.csv, build/print_parts.csv
