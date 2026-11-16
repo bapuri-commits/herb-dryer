@@ -12,7 +12,7 @@ STEP·도면·STL·이슈에서 부품을 부를 때 이 이름을 쓴다. Fusio
 | **B** | 블록 (너트블록·코너블록, 3D 프린트) | `B01_nut_block_bottom_L_30`, `B02_corner_block_top_10_10` |
 | **D** | 문 (바깥판, 플러그, 가스켓, 자석, 경첩, 손잡이) | `D01_door_outer_foamex5T`, `D07_door_pull_handle_96` |
 | **E** | 전장 (측면 박스 안: ESP32, 모듈, WAGO, LCD, 버튼, 퓨즈) | `E01_ESP32_38pin_expansion_board`, `E04_MOS_3_DFR0457`, `E12_inline_fuse_holder` |
-| **H** | 히터 (60mm 순환팬, 알루미늄 덕트, PTC, 서모스탯) | `H06_heater_duct_Al05`, `H07_ear_baffle_R_Al`, `H08_duct_saddle_1_Al` |
+| **H** | 히터 (60mm 순환팬, 알루미늄 덕트, PTC, 서모스탯) | `H06_heater_duct_Al05`, `H09_ptc_window_plate_Al1T`, `H12_ceramic_terminal_2P` |
 | **I** | 흡기 (뒷판 흡기 박스, 40mm 팬, 바깥 활성탄 커버, BME688 #2) | `I01_intake_box_PETG`, `I06_intake_carbon_cover_PETG` |
 | **K** | 측면 전장 박스 (포맥스 판, 코너 블록, 벽 관통 글랜드) | `K01_sidebox_front_foamex5T`, `K06_sidebox_mount_plate_foamex5T`, `K20_gland_PG9_bay_power` |
 | **L** | 로드셀 (블록, 로드셀, 받침판) | `L01_loadcell_base_block`, `L02_loadcell_1kg_bar` |

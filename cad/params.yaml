@@ -13,14 +13,25 @@
 # 키 이름은 CAD 스크립트 안의 변수 이름과 같다 (예: PTC.w → PTC["w"]).
 # ============================================================
 
-PTC:   # PTC 핀 발열체 → H06 히터 덕트, H03, H07 귀 덮개 (v3.0부터 100W 사용 예정 — 아래 값은 50W SZH-PTC002 기준, 100W 도착 후 실측으로 교체)
+PTC:   # PTC 100W 히터 (v3.3.0 확정: 스마트스토어 jojoruby "12V 100W 절연 PTC 세라믹 에어 히터", 12V 옵션) → H03, H09 창판, H06 덕트
+  # 좌표: w = 길이(x, 받침대 포함), h = 높이(z), d = 공기 방향 두께(y). 장착 구멍은 공기 방향으로 관통한다고 가정 → 창판(H09)에 볼트
   bom: 8
-  w:          {value: 95,  status: 판매처 표기, source: "https://www.devicemart.co.kr/goods/view?no=14075260 '95x31' (귀 포함 전체 길이로 가정)"}
-  h:          {value: 31,  status: 판매처 표기, source: "SZH-PTC002 '95x31'"}
-  d:          {value: 25,  status: 가정, source: "같은 형식 54B2 '92×31×25' (알리 1005009279284775) 기준 공기 방향 두께"}
-  ear_len:    {value: 8,   status: 가정, source: "양끝 귀(장착 판) 길이. 도착 후 실측"}
-  ear_t:      {value: 1.0, status: 가정, source: "귀 판 두께"}
-  ear_hole_d: {value: 3.5, status: 가정, source: "귀 구멍 지름 (M3 통과 가정)"}
+  w:          {value: 98,  status: 판매처 표기, source: "jojoruby 상세 이미지 98×32×26 (스크린샷 2026-11-14)"}
+  h:          {value: 32,  status: 판매처 표기, source: "jojoruby 98×32×26"}
+  d:          {value: 26,  status: 판매처 표기, source: "jojoruby 98×32×26"}
+  mount_px:   {value: 86,  status: 판매처 표기, source: "jojoruby 장착 피치 86×24 (긴 쪽 = 길이 방향으로 가정)"}
+  mount_pz:   {value: 24,  status: 가정, source: "jojoruby 장착 피치 86×24의 짧은 쪽. 높이 방향(z)·공기 방향 관통으로 가정 → 도착 후 실측"}
+  slot_l:     {value: 8,   status: 판매처 표기, source: "jojoruby 장착 구멍 8×4 (장공)"}
+  slot_w:     {value: 4,   status: 판매처 표기, source: "jojoruby 장착 구멍 8×4"}
+  fin_l:      {value: 56,  status: 가정, source: "핀(발열부) 길이, 사진 비율로 추정. 양끝 받침대 = (w - fin_l)/2. 창판 개구 폭"}
+  fin_h:      {value: 28,  status: 가정, source: "핀 높이 (h - 위아래 테두리 2+2 가정). 창판 개구 높이"}
+
+CTERM: # 세라믹 단자대 2P 10A 이상 (PTC 리드선 연장) → H12. 상품 미정
+  bom: 68
+  l:       {value: 30, status: 가정, source: "일반 세라믹 단자대 2P 크기, 구매 후 실측"}
+  w:       {value: 20, status: 가정, source: "구매 후 실측"}
+  h:       {value: 14, status: 가정, source: "구매 후 실측"}
+  hole_sp: {value: 22, status: 가정, source: "장착 구멍 2개 간격, 구매 후 실측"}
 
 EXP:   # ESP32 확장보드 CMODULE-47 (디바이스마트 15315957) → 스탠드오프 4개 위치 (E01)
   bom: 21

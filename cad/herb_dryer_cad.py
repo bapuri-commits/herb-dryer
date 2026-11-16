@@ -679,16 +679,24 @@ for i, p in enumerate(COVER_PTS):
 # ============================================================
 # 11. 전장부(본체) — 히터·팬·배플·65°C 서모스탯·DS18B20만
 # ============================================================
-def ksd(name, base, axis_dir, color=(0.85, 0.1, 0.1), note=""):
+def ksd(name, base, axis_dir, color=(0.85, 0.1, 0.1), note="", vert=False):
+    """vert=True: 브래킷(구멍 2개)이 위아래(z) 방향"""
     bx, by, bz = base
     cap = cyl("x", (by, bz), KSD["cap_d"] / 2, *sorted((bx, bx + axis_dir * KSD["body_h"])))
     x0, x1 = sorted((bx, bx - axis_dir * KSD["br_t"]))
-    br = box(x0, by - KSD["br_l"] / 2, bz - 5, x1, by + KSD["br_l"] / 2, bz + 5)
-    for sy in (-1, 1):
-        br = br.cut(cyl("x", (by + sy * KSD["br_hole_sp"] / 2, bz), 1.7, x0 - 1, x1 + 1))
+    L2, sp2 = KSD["br_l"] / 2, KSD["br_hole_sp"] / 2
+    if vert:
+        br = box(x0, by - 5, bz - L2, x1, by + 5, bz + L2)
+        hs = [(by, bz + s_ * sp2) for s_ in (-1, 1)]
+    else:
+        br = box(x0, by - L2, bz - 5, x1, by + L2, bz + 5)
+        hs = [(by + s_ * sp2, bz) for s_ in (-1, 1)]
+    for h_ in hs:
+        br = br.cut(cyl("x", h_, 1.7, x0 - 1, x1 + 1))
     tail = KSD["total_h"] - KSD["body_h"] - KSD["br_t"]
     t0, t1 = sorted((bx - axis_dir * KSD["br_t"], bx - axis_dir * (KSD["br_t"] + tail)))
-    add(name, cap.union(br).union(box(t0, by - 6, bz - 3, t1, by + 6, bz + 3)), color, kind="buy", note=note)
+    tl = box(t0, by - 3, bz - 6, t1, by + 3, bz + 6) if vert else box(t0, by - 6, bz - 3, t1, by + 6, bz + 3)
+    add(name, cap.union(br).union(tl), color, kind="buy", note=note)
 
 fx, fz = FAN_C
 fan_y1h = PART_Y0
@@ -698,68 +706,102 @@ for p in FAN_HOLES:
     fan60 = fan60.cut(cyl("y", p, FAN60["hd"] / 2, fan_y0h - 1, fan_y1h + 1))
 add("H01_fan_60mm_4pin_PWM", fan60, C_BLK, kind="buy", note="Evercool EC6025TH12BP")
 
-# 알루미늄 히터 덕트 (H06): PTC 핀 블록에 1mm 이하로 붙게 접음
-GAP_PTC = 1.0
-ptc_x0 = 27
-PTC_Y0 = 165 - PTC["d"] / 2
+# 알루미늄 히터 덕트 (v3.3.0 상자형): 0.5T ㄷ자 몸통 H06 + 뚜껑 H10 + 팬 쪽 끝판 H11 + PTC 창판 H09 (1T)
+#   PTC는 창판에 볼트 4개로 매달림. 창판 개구 = 핀 면만 → 받침대·옆 우회 공기 없음 (v3.2 귀 덮개 H07 대신)
+#   몸통은 PTC와 간격을 넉넉히 → PTC 치수가 바뀌면 창판 H09만 다시 만든다
+#   덕트 바닥은 스탠드오프 위 M3 와셔 3장(1.5)으로 띄움 (v3.2 받침 H08 대신). 팬 Ø57 구멍 아래 살 2mm 확보
+HT, HT1 = 0.5, 1.0                              # 몸통·뚜껑 0.5T, 창판·끝판 1T
+BX_X0 = 26.5                                    # 몸통 왼벽 바깥 (A17 앵글 25.5와 1mm)
+ptc_x0 = BX_X0 + HT + 0.5                       # PTC 왼끝 (왼벽과 0.5)
+PTC_X1 = ptc_x0 + PTC["w"]
+PTC_CX = (ptc_x0 + PTC_X1) / 2
+PTC_Y0, PTC_Y1 = 165 - PTC["d"] / 2, 165 + PTC["d"] / 2
 PTC_Z0 = FAN_C[1] - PTC["h"] / 2
-H_X0, H_X1 = ptc_x0 - GAP_PTC - 0.5, ptc_x0 + PTC["w"] + GAP_PTC + 0.5
-H_Z0, H_Z1 = PTC_Z0 - GAP_PTC - 0.5, PTC_Z0 + PTC["h"] + GAP_PTC + 0.5
-H_Y0, H_Y1 = 145, 187
-fl_y = fan_y0h - 1                              # 팬 앞 플랜지 (알루미늄 1T)
-flange = box(fx - 30, fl_y, fz - 30, fx + 30, fan_y0h, fz + 30).cut(cyl("y", FAN_C, 28.5, fl_y - 1, fan_y0h + 1))
+TH95_BASE_X = PTC_X1 + KSD["body_h"] + 0.1      # 95°C 캡이 PTC 오른쪽 끝면에 닿게
+BX_X1 = TH95_BASE_X - 2.4                       # 몸통 오른벽 바깥 (벽~브래킷 와셔 2.4)
+SPACER_T = 1.5                                  # M3 평와셔 3장
+BX_Z0 = IN0 + T05 + SPACER_T                    # 몸통 바닥 바깥
+BX_Z1 = FLOOR_Z - 1.5                           # 뚜껑 윗면 (타공판 A10과 1.5)
+BX_Y0, BX_Y1 = 145, fan_y0h                     # 출구 ~ 팬 앞면
+IX0, IX1 = BX_X0 + HT, BX_X1 - HT               # 몸통 안쪽
+IZ0, IZ1 = BX_Z0 + HT, BX_Z1 - HT
+H_X0, H_X1, H_Z0, H_Z1, H_Y0, H_Y1 = BX_X0, BX_X1, BX_Z0, BX_Z1, BX_Y0, BX_Y1   # (다른 곳 참조용)
+fl_y = fan_y0h - 1.0                            # 끝판 앞면
+assert IX0 <= FAN_C[0] - 30 and IX1 >= FAN_C[0] + 30 and IZ0 <= FAN_C[1] - 28.5 and IZ1 >= FAN_C[1] + 28.5, "팬 구멍이 덕트 밖"
+assert PTC_Z0 > IZ0 + 3 and PTC_Z0 + PTC["h"] < IZ1 - 3, "PTC 높이가 덕트 안에 안 들어감"
+FLG = 10                                        # 창판·끝판·뚜껑 날개 (바깥 치수)
+
+# H06 몸통: 바닥 + 양옆 (ㄷ자 2번 접기)
+duct = box(BX_X0, BX_Y0, BX_Z0, BX_X1, BX_Y1, IZ0) \
+    .union(box(BX_X0, BX_Y0, BX_Z0, IX0, BX_Y1, IZ1)).union(box(IX1, BX_Y0, BX_Z0, BX_X1, BX_Y1, IZ1))
+DUCT_SO = [(50, 165), (110, 165)]               # 바닥 → 스탠드오프 (v3.2 H08 자리 그대로)
+for p in DUCT_SO:
+    duct = duct.cut(cyl("z", p, 1.7, BX_Z0 - 1, IZ0 + 1))
+duct = duct.cut(cyl("x", (165, FAN_C[1]), KSD["cap_d"] / 2 + 0.5, IX1 - 1, BX_X1 + 1))
+th95_holes = [(165, FAN_C[1] + sz * KSD["br_hole_sp"] / 2) for sz in (-1, 1)]
+for p in th95_holes:
+    duct = duct.cut(cyl("x", p, 1.7, IX1 - 1, BX_X1 + 1))
+add("H06_heater_duct_Al05", duct, C_AL, "알루미늄 0.5T", "재단+절곡",
+    note=f"ㄷ자 (바닥 {BX_X1 - BX_X0:.1f} + 양옆 {IZ1 - BX_Z0:.1f}), 길이 {BX_Y1 - BX_Y0:g}. 오른벽 = 95°C 서모스탯 캡 Ø{KSD['cap_d'] + 1:g} + Ø3.4 ×2. "
+         "바닥 Ø3.4 ×2 → 와셔 3장 + 스탠드오프. 이음매 알루미늄 테이프")
+# H10 뚜껑: 위판 + 양옆 날개 (몸통 바깥에 겹쳐 리벳)
+lid = box(BX_X0 - HT, BX_Y0, IZ1, BX_X1 + HT, BX_Y1, BX_Z1) \
+    .union(box(BX_X0 - HT, BX_Y0, BX_Z1 - FLG, BX_X0, BX_Y1, BX_Z1)).union(box(BX_X1, BX_Y0, BX_Z1 - FLG, BX_X1 + HT, BX_Y1, BX_Z1))
+add("H10_heater_duct_lid_Al05", lid, C_AL, "알루미늄 0.5T", "재단+절곡",
+    note=f"위판 + 양옆 날개 {FLG} (2번 접기), 날개를 몸통 바깥에 리벳 3개씩. PTC 리드선을 출구 쪽으로 뺀 뒤 덮기")
+# H11 끝판: 팬 쪽 (1T), 날개 2개는 출구 쪽으로
+endp = box(IX0, fl_y, IZ0, IX1, fan_y0h, IZ1).cut(cyl("y", FAN_C, 28.5, fl_y - 1, fan_y0h + 1))
 for p in FAN_HOLES:
-    flange = flange.cut(cyl("y", p, 1.7, fl_y - 1, fan_y0h + 1))
-trans = (cq.Workplane("XZ", origin=(0, fl_y, 0)).center(fx, fz).rect(60, 60)
-         .workplane(offset=fl_y - H_Y1).center((H_X0 + H_X1) / 2 - fx, (H_Z0 + H_Z1) / 2 - fz).rect(H_X1 - H_X0, H_Z1 - H_Z0).loft())
-trans_in = (cq.Workplane("XZ", origin=(0, fl_y + 0.01, 0)).center(fx, fz).rect(59, 59)
-            .workplane(offset=fl_y - H_Y1 + 0.02).center((H_X0 + H_X1) / 2 - fx, (H_Z0 + H_Z1) / 2 - fz).rect(H_X1 - H_X0 - 1, H_Z1 - H_Z0 - 1).loft())
-hous = box(H_X0, H_Y0, H_Z0, H_X1, H_Y1, H_Z1).cut(box(H_X0 + 0.5, H_Y0 - 1, H_Z0 + 0.5, H_X1 - 0.5, H_Y1 + 1, H_Z1 - 0.5))
-EAR_HOLES = [(ptc_x0 + PTC["ear_len"] / 2, 165), (ptc_x0 + PTC["w"] - PTC["ear_len"] / 2, 165)]
-for p in EAR_HOLES:
-    hous = hous.cut(cyl("z", p, 1.7, H_Z0 - 1, H_Z0 + 1))
-TH95_BASE_X = ptc_x0 + PTC["w"] - PTC["ear_len"] + KSD["body_h"] + 0.1
-hous = hous.cut(cyl("x", (165, FAN_C[1]), KSD["cap_d"] / 2 + 0.5, H_X1 - 1, H_X1 + 1))
-th95_holes = [(165 + sy * KSD["br_hole_sp"] / 2, FAN_C[1]) for sy in (-1, 1)]
-for p in th95_holes:
-    hous = hous.cut(cyl("x", p, 1.7, H_X1 - 1, H_X1 + 1))
-hduct = flange.union(trans.cut(trans_in)).union(hous)
-add("H06_heater_duct_Al05", hduct, C_AL, "알루미늄 0.5T + 1T 플랜지", "재단+절곡",
-    note="v3.0 PETG 대신. 핀 블록에 1mm 이하, 이음매 알루미늄 테이프. 팬 쪽 플랜지만 1T")
-# 귀 자리 막음 (PTC 양끝 귀 위 빈 공간 → 공기 우회 차단), 오른쪽은 서모스탯 캡·너트 자리
-fills = [box(H_X0 + 0.5, PTC_Y0, PTC_Z0 + PTC["ear_t"], ptc_x0 + PTC["ear_len"], PTC_Y0 + PTC["d"], H_Z1 - 0.5),
-         box(ptc_x0 + PTC["w"] - PTC["ear_len"], PTC_Y0, PTC_Z0 + PTC["ear_t"], H_X1 - 0.5, PTC_Y0 + PTC["d"], H_Z1 - 0.5)]
-fills[1] = fills[1].cut(cyl("x", (165, FAN_C[1]), KSD["cap_d"] / 2 + 0.5, ptc_x0 + PTC["w"] - PTC["ear_len"] - 1, H_X1))
-for p in th95_holes:
-    fills[1] = fills[1].cut(cyl("x", p, 3.4, H_X1 - 9, H_X1))
-for p in EAR_HOLES:
-    fills = [f_.cut(cyl("z", p, 3.0, PTC_Z0, PTC_Z0 + 4)) for f_ in fills]
-add("H07_ear_baffle_L_Al", fills[0], C_AL, "알루미늄 1T 접기", "재단+절곡", note="귀 위 우회 통로 막음")
-add("H07_ear_baffle_R_Al", fills[1], C_AL, "알루미늄 1T 접기", "재단+절곡", note="귀 위 우회 통로 막음, 서모스탯 캡 구멍")
-fin = box(ptc_x0 + PTC["ear_len"], PTC_Y0, PTC_Z0, ptc_x0 + PTC["w"] - PTC["ear_len"], PTC_Y0 + PTC["d"], PTC_Z0 + PTC["h"])
-for ex_, p in zip((ptc_x0, ptc_x0 + PTC["w"] - PTC["ear_len"]), EAR_HOLES):
-    fin = fin.union(box(ex_, PTC_Y0, PTC_Z0, ex_ + PTC["ear_len"], PTC_Y0 + PTC["d"], PTC_Z0 + PTC["ear_t"])
-                    .cut(cyl("z", p, PTC["ear_hole_d"] / 2, PTC_Z0 - 1, PTC_Z0 + 2)))
-add("H03_PTC_fin_12V", fin, C_HOT, kind="buy", note="100W(PWM 80% 제한) 또는 50W, 95×31. 귀·두께 도착 후 실측. 설치 전 밖에서 30분 태움")
-for i, p in enumerate(EAR_HOLES):
-    bolt(f"H_ptc_bolt_{i}", "z", p, PTC_Z0 + PTC["ear_t"], -1, 6, spec="M3×6 냄비머리 볼트 (PTC 귀)")
-    nut(f"H_ptc_nut_{i}", "z", p, H_Z0, -1)
-ksd("H05_thermostat_KSD301_95C", (TH95_BASE_X, 165, FAN_C[1]), -1, note="NC 95°C. 캡이 핀 블록 끝면에 닿게, 브래킷과 벽 사이 와셔")
+    endp = endp.cut(cyl("y", p, 1.7, fl_y - 1, fan_y0h + 1))
+endp = endp.union(box(IX0, fan_y0h - FLG, IZ0, IX0 + 1, fl_y, IZ1)).union(box(IX1 - 1, fan_y0h - FLG, IZ0, IX1, fl_y, IZ1))
+add("H11_heater_duct_end_Al1T", endp, C_AL, "알루미늄 1T", "재단+절곡",
+    note=f"팬 앞 (Ø57 + Ø3.4 ×4, 팬 볼트로 같이 조임). 날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩")
+# H09 PTC 창판: 핀 면만 열림, PTC를 볼트 4개로 매닮 (1T), 날개는 팬 쪽으로
+WIN = (PTC_CX - PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] - PTC["fin_h"]) / 2, PTC_CX + PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] + PTC["fin_h"]) / 2)
+PTC_HOLES = [(PTC_CX + sx * PTC["mount_px"] / 2, FAN_C[1] + sz * PTC["mount_pz"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
+win = box(IX0, PTC_Y1, IZ0, IX1, PTC_Y1 + 1, IZ1).cut(box(WIN[0], PTC_Y1 - 1, WIN[1], WIN[2], PTC_Y1 + 2, WIN[3]))
+for p in PTC_HOLES:
+    win = win.cut(cyl("y", p, 1.7, PTC_Y1 - 1, PTC_Y1 + 2))
+win = win.union(box(IX0, PTC_Y1 + 1, IZ0, IX0 + 1, PTC_Y1 + FLG, IZ1)).union(box(IX1 - 1, PTC_Y1 + 1, IZ0, IX1, PTC_Y1 + FLG, IZ1))
+add("H09_ptc_window_plate_Al1T", win, C_AL, "알루미늄 1T", "재단+절곡",
+    note=f"개구 {PTC['fin_l']:g}×{PTC['fin_h']:g} = PTC 핀 면 [가정], 장착 Ø3.4 ×4 피치 {PTC['mount_px']:g}×{PTC['mount_pz']:g}. "
+         f"날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩. PTC 실측 후 이 판만 확정. 판 둘레 틈은 알루미늄 테이프")
+# H03 PTC (받침대 2 + 핀): 장착 구멍은 공기 방향 관통 [가정]
+ptc = box(ptc_x0, PTC_Y0, PTC_Z0, PTC_X1, PTC_Y1, PTC_Z0 + PTC["h"])
+for p in PTC_HOLES:
+    ptc = ptc.cut(cyl("y", p, PTC["slot_w"] / 2, PTC_Y0 - 1, PTC_Y1 + 1))
+add("H03_PTC_fin_12V", ptc, C_HOT, kind="buy",
+    note=f"12V 100W 절연 PTC {PTC['w']:g}×{PTC['h']:g}×{PTC['d']:g} (jojoruby, 12V 옵션), PWM 최대 80%. 받침대 수지 [가정] → 설치 전 밖에서 30분 태움. "
+         "리드선 200mm는 출구 쪽으로 빼서 H12 세라믹 단자대에서 연장")
+for i, p in enumerate(PTC_HOLES):
+    bolt(f"H_ptc_bolt_{i}", "y", p, PTC_Y0, +1, 30, spec="M3×30 냄비머리 볼트 (PTC → 창판)")
+    nut(f"H_ptc_nut_{i}", "y", p, PTC_Y1 + 1, +1)
+ksd("H05_thermostat_KSD301_95C", (TH95_BASE_X, 165, FAN_C[1]), -1, vert=True,
+    note="NC 95°C. 캡이 PTC 오른쪽 끝면(받침대)에 닿게, 브래킷과 벽 사이 와셔 2.4. 실물 보고 핀 쪽 접촉 가능하면 위치 재검토")
 for i, p in enumerate(th95_holes):
     bolt(f"H_th95_bolt_{i}", "x", p, TH95_BASE_X + KSD["br_t"], -1, 8, spec="M3×8 냄비머리 볼트 (서모스탯)")
-    nut(f"H_th95_nut_{i}", "x", p, H_X1 - 0.5, -1)
+    nut(f"H_th95_nut_{i}", "x", p, IX1, -1)
 for i, p in enumerate(FAN_HOLES):
-    bolt(f"H_fan_bolt_{i}", "y", p, PART_Y1, -1, 30, spec="M3×30 냄비머리 볼트 (칸막이+팬+덕트 플랜지)")
+    bolt(f"H_fan_bolt_{i}", "y", p, PART_Y1, -1, 30, spec="M3×30 냄비머리 볼트 (칸막이+팬+덕트 끝판)")
     nut(f"H_fan_nut_{i}", "y", p, fl_y, -1)
-# 덕트 받침 (알루미늄 1T L자 접기 2개, 스탠드오프 10)
-SAD_X = (45, 105)
-for i, x in enumerate(SAD_X):
-    sd = box(x - 0.5, 150, IN0 + T05, x + 0.5, 180, H_Z0).union(box(x - 0.5, 150, IN0 + T05, x + 10, 180, IN0 + T05 + 1))
-    sd = sd.cut(cyl("z", (x + 5, 165), 1.7, 0, 30))
-    add(f"H08_duct_saddle_{i+1}_Al", sd, C_AL, "알루미늄 1T 판 L자 접기", "재단+절곡",
-        note=f"세운 다리 {H_Z0 - IN0 - T05:.1f} × 바닥 다리 10.5 (바깥 치수), 길이 30. 10×10 앵글로는 안 됨. 덕트 바닥에 리벳")
-    so(f"H08_so_{i}", x + 5, 165, 10)
-    bolt(f"H08_bolt_{i}", "z", (x + 5, 165), IN0 + T05 + 1, -1, 6, spec="M3×6 냄비머리 볼트 (덕트 받침)")
+# 덕트 바닥 → 와셔 3장 → 스탠드오프 10
+for i, p in enumerate(DUCT_SO):
+    so(f"H06_so_{i}", p[0], p[1], 10)
+    add(f"H06_spacer_washer_{i}", cyl("z", p, 3.5, IN0 + T05, BX_Z0).cut(cyl("z", p, 1.6, IN0, BX_Z0 + 1)), C_BOLT, kind="fastener")
+    count("M3 평와셔 (덕트 스페이서)", 3)
+    bolt(f"H06_bolt_{i}", "z", p, IZ0, -1, 8, spec="M3×8 냄비머리 볼트 (덕트 바닥 → 스탠드오프)")
+# H12 PTC 리드선 연장 세라믹 단자대 2P (전장부 바닥, PG9 전력 글랜드 근처). 크기 [가정]
+CT = PARAMS["CTERM"]
+ct_x, ct_y = 245, 45
+ct = box(ct_x - CT["l"] / 2, ct_y - CT["w"] / 2, IN0 + T05, ct_x + CT["l"] / 2, ct_y + CT["w"] / 2, IN0 + T05 + CT["h"])
+CT_HOLES = [(ct_x + sx * CT["hole_sp"] / 2, ct_y) for sx in (-1, 1)]
+for p in CT_HOLES:
+    ct = ct.cut(cyl("z", p, 1.7, IN0, IN0 + T05 + CT["h"] + 1))
+add("H12_ceramic_terminal_2P", ct, (0.95, 0.95, 0.9), kind="buy",
+    note="PTC 리드선 200mm → 실리콘 18AWG 연장. 세라믹·황동만 (공기 통로 원칙). 크기 도착 후 실측")
+for i, p in enumerate(CT_HOLES):
+    so(f"H12_so_{i}", p[0], p[1], 10)
+    bolt(f"H12_bolt_{i}", "z", p, IN0 + T05 + CT["h"], -1, CT["h"] + 6, spec=f"M3×{CT['h'] + 6:g} 냄비머리 볼트 (세라믹 단자대)")
 
 ob = box(fx - 32, 124, BAY_Z0 + T05, fx + 32, 125, FLOOR_Z - 12).union(box(fx - 32, 125, BAY_Z0 + T05, fx + 32, 137, BAY_Z0 + T05 + 1))
 OB_HOLES = [(fx - 20, 131), (fx + 20, 131)]
