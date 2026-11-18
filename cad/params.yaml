@@ -64,6 +64,7 @@ FAN60: # 60mm 순환팬 Evercool EC6025TH12BP PWM → 칸막이 P04 구멍, 히�
   t:    {value: 25,  status: 판매처 표기, source: "도면 25.2±0.5. 덕트 플랜지·칸막이 사이에 끼우므로 25 유지, 볼트 길이 여유로 흡수"}
   hole: {value: 50,  status: 판매처 표기, source: "도면 50±0.3"}
   hd:   {value: 4.4, status: 판매처 표기, source: "도면 8-Ø4.4±0.3"}
+  duct_hole_d: {value: 56, status: 가정, source: "v3.4.0 히터 덕트 끝판 H11 팬 구멍. 1T 몸통 안쪽 높이에서 판 모서리 1.5mm 유지 (칸막이 A15는 Ø57 그대로)"}
 
 FAN40: # 40mm 흡기팬 Evercool EC4010TH12BP PWM → 흡기 박스 I01, 앞판 구멍
   bom: 10
@@ -174,3 +175,10 @@ MAG:   # 문 자석 8×3 네오디뮴 → 앞판 P02·문 D01 자석 포켓 (D05
 LINER: # v3.2.0: 알루미늄 라이너 구멍 (업체 가공). 포맥스·폼 구멍은 그대로
   bolt_d:  {value: 4.0,  status: 가정, source: "팀 결정 11/14: M3 볼트·나사 구멍 Ø3.4 → Ø4.0 (포맥스·폼·라이너 겹침 오차 흡수)"}
   cable_d: {value: 12.0, status: 가정, source: "케이블 구멍 + 실리콘 그로밋 Ø12 (판 0.5~1mm용, BOM 51)"}
+
+VENDOR_COLORS: # v3.4.0 알루미늄 업체 DXF 색 (ACI). 특정 업체 규칙이 아닌 "보기 쉽게". 업체가 규칙을 주면 여기만 바꿈
+  outer: {value: 5, status: 가정, source: "외곽 (잘라 낼 바깥선) 파랑, 레이어 OUTER"}
+  hole:  {value: 3, status: 가정, source: "구멍·안쪽 개구 (관통) 초록, 레이어 HOLE"}
+  bend:  {value: 1, status: 가정, source: "절곡선 (자르지 않음) 빨강 점선 DASHED, 레이어 BEND"}
+  stock: {value: 6, status: 가정, source: "소재크기 (외곽 + 사방 5) 자홍, 레이어 STOCK"}
+  note:  {value: 8, status: 가정, source: "글자·범례 회색, 레이어 NOTE"}
