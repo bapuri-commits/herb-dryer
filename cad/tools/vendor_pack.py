@@ -1,29 +1,22 @@
-"""외주 발주 패키지: 포맥스 외관판(CNC 라우터) + 알루미늄 1차(레이저·절곡)
+"""외주 발주 패키지: 포맥스 외관판(CNC 라우터) + 알루미늄 전부 1T(레이저·절곡, v3.4.0 한 묶음)
 
 python cad/tools/vendor_pack.py <cad.py> [출력폴더]
 
-묶음: foamex/ (포맥스), aluminum/ (알루미늄 1차), aluminum2/ (알루미늄 2차 = 히터 덕트, 1차와 같이 발주 가능)
+foamex/ (포맥스)
+  dxf/<판>.dxf       판마다 1개, 단위 mm, 1:1, AutoCAD 2000. dxf_R12/ = 같은 내용 R12
+  */all_panels.dxf   모든 판을 한 장에 늘어놓은 것 (종류별 1개, 견적용)
+  발주표.xlsx, 확인도면.pdf (판마다 1쪽, 구멍 ID·좌표표)
+  레이어: CUT_OUTER 외곽 / CUT_INNER 안쪽 개구 / DRILL 구멍(Ø8 이하) / NOTE 글자
 
-결과 (출력폴더/foamex/, 출력폴더/aluminum/ 같은 형식):
-  dxf/<판>.dxf       판마다 1개, 단위 mm, 1:1, AutoCAD 2000(R2000) 형식
-  dxf_R12/           같은 내용, AutoCAD R12 형식 (구버전 CAM용)
-  */all_panels.dxf   모든 판을 한 장에 늘어놓은 것 (견적용, 배치는 업체가)
-  발주표.xlsx        판·재료·크기·수량·가공·구멍 수, 업체 전달 사항
-  확인도면.pdf       판마다 1쪽 (외곽 치수, 구멍 ID·좌표표). 절곡 부품은 펼친 그림 + 접은 뒤 치수
-  step/              (알루미늄만) 절곡 부품 3D (1차: A12 + 앵글 대용 L자 9종, 2차: 히터 덕트 4종)
-  dxf_laser/         (알루미늄만) 레이저 업체 색 규칙판, 평판만 (v3.2.1)
-                     외곽 OUTER_CUT ACI 5 파랑, 구멍·개구 INNER_CUT ACI 2 노랑, 소재크기 MATERIAL ACI 6 자홍
-                     글자·접는 선 없음, 빨강(ACI 1 = 업체 규칙상 각인) 안 씀. 절곡 부품은 step/ 만 올린다
+aluminum/ (알루미늄 1T 전부: 라이너·평판·띠·A12·E07·L자 9종·히터 덕트 4종)
+  dxf/<부품>.dxf     AutoCAD 2000, 색은 params VENDOR_COLORS (기본: 외곽 파랑 5, 구멍 초록 3,
+                     절곡선 빨강 1 점선, 소재크기 자홍 6 = 외곽 + 사방 5, 글자 회색 8), 왼쪽 위 범례
+                     레이어 OUTER / HOLE / BEND / STOCK / NOTE (영문: R2000 한글 깨짐 방지)
+  step/<부품>.step   평판 = DXF를 두께만큼, 절곡 부품 = 접은 형상
+  2D도면.pdf         표지(부품표·공통 조건) + 부품마다 1쪽 (외곽 치수, 구멍 표, 절곡선 B1·B2, 접은 뒤 치수)
+  발주표.xlsx        '올릴 파일' 열: 평판 = dxf + step, 절곡 = step + 2D도면
 
-레이어 (dxf/, dxf_R12/ — 사람이 보는 용도)
-  CUT_OUTER   외곽 절단
-  CUT_INNER   안쪽 개구부 절단 (사각 구멍, Ø8 넘는 원)
-  DRILL       드릴 구멍 (Ø8 이하 원)
-  BEND        접는 선 (알루미늄 절곡 부품)
-  NOTE        글자 — 자르지 않음
-
-포켓·접시머리 자리는 넣지 않음 (직접 가공).
-면적 1cm² 미만의 외곽 조각(구멍이 판 모서리를 깎고 남은 부스러기)은 뺀다.
+포켓·접시머리 자리는 넣지 않음 (직접 가공). 면적 1cm² 미만의 외곽 조각은 뺀다.
 """
 import os, re, sys, json, shutil, importlib.util
 from collections import Counter
@@ -71,30 +64,27 @@ FOAMEX = dict(
     footer="여분: K01·K02·D01은 저희가 손으로 구멍을 뚫는 판이라 1장씩 더 주문 (수량에 포함)",
 )
 
-# ---------------------------------------------------------------- 알루미늄 1차
+# ---------------------------------------------------------------- 알루미늄 (v3.4.0: 전부 1T, 한 묶음)
 ALUMINUM = dict(
-    key="aluminum", title="알루미늄 1차",
-    material="알루미늄 판 (업체 기본 재질), 0.5T·1T",
+    key="aluminum", title="알루미늄 (전부 1T)",
+    material="알루미늄 판 1T (업체 기본 재질)",
     groups=[
-        (("A01", "A02", "A03", "A04", "A06", "A07", "D03"), "all", "0.5T 외곽+구멍"),
-        (("A10", "A11", "A15", "A16", "T04"), "all", "1T 외곽+구멍"),
+        (("A01", "A02", "A03", "A04", "A06", "A07", "D03"), "all", "1T 라이너"),
+        (("A10", "A11", "A15", "A16", "T04"), "all", "1T 판"),
     ],
     spare={"A04_liner_ch_L": 1},
     extra=[],          # run_aluminum 에서 CAD 값으로 채움 (T03 띠, 모서리 판)
     notes=[
-        "재료: 알루미늄 판 (재질은 업체 기본), 0.5T와 1T. 0.5T는 손으로 접을 수 있는 무른 판이면 좋겠습니다",
-        "치수는 완성 치수. 공차 ±0.3mm, 모서리 버(burr) 제거",
-        "업체에 올릴 파일 = 발주표 '올릴 파일' 열: 평판은 dxf_laser/ (외부 커팅 파랑 ACI 5, 내부 커팅 노랑 ACI 2, 소재크기 자홍 ACI 6), "
-        "접는 부품은 step/ (DXF는 올리지 않음). 단위 mm, 1:1, AutoCAD 2000",
-        "dxf/·dxf_R12/·확인도면.pdf는 확인용 (DRILL=빨강, BEND=파랑이라 업체 색 규칙과 다름 — 그대로 올리지 마세요)",
-        "0.5T 라이너도 외곽 + 구멍 (M3 Ø4.0, 케이블 Ø12, A03_back 흡기 개구 50×50). 1T 타공판 A10은 Ø4·Ø5 구멍 전부 (레이저)",
-        "절곡 부품 A12: 도면 치수는 접은 뒤 바깥 치수입니다. DXF의 펼친 그림은 바깥 치수 합(공제 전)이라 "
-        "전개 치수는 업체 기준으로 계산해 주세요. 90° 한 번 접기. 견적은 STEP으로",
-        "앵글 대신 1T L자 절곡 13개('1T 절곡 (앵글 대신)', STEP 9종): 견적 비교용입니다. 비싸면 이 묶음만 빼 주세요 (저희가 앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
+        "재료: 알루미늄 1T 전부 (재질은 업체 기본). 재료 포함 견적",
+        "치수는 완성 치수. 공차 ±0.3mm, 모서리 버(burr) 제거, 판마다 부품 이름 표시",
+        "업체에 올릴 파일 = 발주표 '올릴 파일' 열: 평판 = dxf/ + step/, 절곡 부품 = step/ + 2D도면.pdf (같은 쪽 번호)",
+        "DXF_COLORS",   # run_aluminum에서 params VENDOR_COLORS로 채움
+        "절곡 부품: 펼친 그림은 바깥 치수 합(굽힘 공제 전) — 전개는 업체 기준으로. 모두 90°. 접은 뒤 바깥 치수는 2D도면",
+        "앵글 대신 1T L자 10×10 절곡 13개: 비싸면 이 묶음만 빼 주세요 (앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
         "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요",
-        "판마다 연필로 판 이름을 적어 주세요",
+        "H09 PTC 창판은 개구만 (장착 구멍은 저희가 PTC에 대고 뚫음)",
     ],
-    footer="여분: A04_L 라이너 1장. (v3.3.0: 덕트 받침 H08 삭제). T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음). 앵글 대신 절곡 묶음은 견적 비교용",
+    footer="여분: A04_L 라이너 1장. T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음)",
 )
 
 
@@ -239,10 +229,16 @@ def write_package(items, pk, out, version):
               f"  inner {len(it['inner'])}  drill {drill_summary(it['drill'])}")
 
 
-# ---------------------------------------------------------------- 레이저 업체 색 규칙 (v3.2.1, 알루미늄)
-LASER_LAYERS = (("OUTER_CUT", 5), ("INNER_CUT", 2), ("MATERIAL", 6))   # 외부 커팅 / 내부 커팅 / 소재크기
-LASER_COLORS = {c for _, c in LASER_LAYERS}
-MATERIAL_MARGIN = 5.0
+# ---------------------------------------------------------------- 알루미늄 업체 DXF (v3.4.0: 범용 색, params VENDOR_COLORS)
+STOCK_MARGIN = 5.0
+# 레이어 이름·범례는 영문만: AutoCAD 2000 DXF는 한글을 \\U+XXXX로 저장해 일부 CAM에서 깨짐 (한글 설명은 2D도면·발주표)
+AL_LAYER_NAMES = dict(outer="OUTER", hole="HOLE", bend="BEND", stock="STOCK", note="NOTE")
+AL_LEGEND = dict(outer="OUTER = cut outline", hole="HOLE = cut through (holes, openings)", bend="BEND = bend line, do not cut (dashed)",
+                 stock="STOCK = material size (outline + 5 each side)", note="NOTE = text, do not cut")
+AL_LEGEND_KO = dict(outer="외곽 (잘라 낼 바깥선)", hole="구멍·안쪽 개구 (관통)", bend="절곡선 (자르지 않음, 점선)",
+                    stock="소재크기 (외곽 + 사방 5)", note="글자·범례 (자르지 않음)")
+ACI_NAME = {1: "RED", 2: "YELLOW", 3: "GREEN", 4: "CYAN", 5: "BLUE", 6: "MAGENTA", 7: "WHITE", 8: "GRAY"}
+ACI_KO = {1: "빨강", 2: "노랑", 3: "초록", 4: "하늘", 5: "파랑", 6: "자홍", 7: "흰/검", 8: "회색"}
 
 
 def thick_of(it):
@@ -251,40 +247,45 @@ def thick_of(it):
     return float(m.group(1))
 
 
-def write_laser(items, out):
-    """평판만 dxf_laser/<판>.dxf. 엔티티 색도 직접 지정 (BYLAYER 안 씀)"""
-    if all(it.get("bend") for it in items): return       # 전부 절곡이면 STEP만
-    os.makedirs(os.path.join(out, "dxf_laser"))
-    for it in items:
-        if it.get("bend"): continue
-        doc = ezdxf.new("R2000"); doc.units = ezdxf.units.MM
-        for ln, col in LASER_LAYERS: doc.layers.add(ln, color=col)
-        ms = doc.modelspace()
-        A = lambda ln, col: {"layer": ln, "color": col}
-        for o in it["outer"]: ms.add_lwpolyline(o[1], close=True, dxfattribs=A("OUTER_CUT", 5))
-        for g in it["inner"] + it["drill"]:
-            if g[0] == "circle": ms.add_circle(g[1], g[2], dxfattribs=A("INNER_CUT", 2))
-            else: ms.add_lwpolyline(g[1], close=True, dxfattribs=A("INNER_CUT", 2))
-        xs = [q[0] for o in it["outer"] for q in o[1]]; ys = [q[1] for o in it["outer"] for q in o[1]]
-        m = MATERIAL_MARGIN
-        ms.add_lwpolyline([(min(xs) - m, min(ys) - m), (max(xs) + m, min(ys) - m), (max(xs) + m, max(ys) + m), (min(xs) - m, max(ys) + m)],
-                          close=True, dxfattribs=A("MATERIAL", 6))
-        doc.saveas(os.path.join(out, "dxf_laser", f"{it['name']}.dxf"))
+def write_al_dxf(it, fn, vc, version):
+    """판마다 1파일. 엔티티 색 직접 지정. 왼쪽 위 범례 (NOTE)"""
+    doc = ezdxf.new("R2000", setup=True); doc.units = ezdxf.units.MM
+    for k, ln in AL_LAYER_NAMES.items():
+        doc.layers.add(ln, color=vc[k], linetype="DASHED" if k == "bend" else "Continuous")
+    ms = doc.modelspace()
+    A = lambda k: {"layer": AL_LAYER_NAMES[k], "color": vc[k]}
+    for o in it["outer"]: ms.add_lwpolyline(o[1], close=True, dxfattribs=A("outer"))
+    for g in it["inner"] + it["drill"]:
+        if g[0] == "circle": ms.add_circle(g[1], g[2], dxfattribs=A("hole"))
+        else: ms.add_lwpolyline(g[1], close=True, dxfattribs=A("hole"))
+    for (a, b) in it.get("bend", []):
+        ms.add_line(a, b, dxfattribs=A("bend") | {"linetype": "DASHED", "ltscale": 0.3})
+    xs = [q[0] for o in it["outer"] for q in o[1]]; ys = [q[1] for o in it["outer"] for q in o[1]]
+    m = STOCK_MARGIN; x0, x1, y0, y1 = min(xs) - m, max(xs) + m, min(ys) - m, max(ys) + m
+    ms.add_lwpolyline([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], close=True, dxfattribs=A("stock"))
+    h = 2.5
+    lines = [f"{it['name']}  AL {thick_of(it):g}T  {it['W']:g}x{it['H']:g}  qty {it['qty']}  {version}"]
+    if it.get("bend"): lines.append(f"FOLDED (outside): {it['finished']}  — flat = sum of outside dims, apply bend deduction")
+    lines += [f"{ACI_NAME.get(vc[k], vc[k])}: {AL_LEGEND[k]}" for k in ("outer", "hole", "bend", "stock")]
+    for i, t in enumerate(lines):
+        ms.add_text(t, height=h, dxfattribs=A("note")).set_placement((x0, y1 + 4 + (len(lines) - 1 - i) * h * 1.6))
+    doc.saveas(fn)
 
 
-def check_laser(items, out):
-    """업체 규칙: 색 {2,5,6}만, 구멍 지름 ≥ 두께, 구멍 사이·구멍~모서리 간격 ≥ 두께"""
-    bad = []
+def check_al(items, out, vc):
+    """색은 VENDOR_COLORS 안, 구멍 지름 ≥ 두께, 구멍 사이·구멍~모서리(개구) 간격 ≥ 두께"""
+    bad = []; allowed = set(vc.values())
     for it in items:
         t = thick_of(it)
-        if not it.get("bend"):
-            fn = os.path.join(out, "dxf_laser", f"{it['name']}.dxf")
-            doc = ezdxf.readfile(fn)
-            if doc.dxfversion != "AC1015": bad.append(f"{it['name']}: DXF 버전 {doc.dxfversion}")
-            for e in doc.modelspace():
-                col = e.dxf.color if e.dxf.hasattr("color") else 256
-                if col not in LASER_COLORS: bad.append(f"{it['name']}: {e.dxftype()} 색 {col} (레이어 {e.dxf.layer})")
-                if e.dxftype() not in ("LWPOLYLINE", "CIRCLE"): bad.append(f"{it['name']}: 엔티티 {e.dxftype()}")
+        doc = ezdxf.readfile(os.path.join(out, "dxf", f"{it['name']}.dxf"))
+        if doc.dxfversion != "AC1015": bad.append(f"{it['name']}: DXF 버전 {doc.dxfversion}")
+        nb = 0
+        for e in doc.modelspace():
+            col = e.dxf.color if e.dxf.hasattr("color") else 256
+            if col not in allowed: bad.append(f"{it['name']}: {e.dxftype()} 색 {col}")
+            if e.dxftype() == "LINE": nb += 1
+            if e.dxftype() not in ("LWPOLYLINE", "CIRCLE", "LINE", "TEXT"): bad.append(f"{it['name']}: 엔티티 {e.dxftype()}")
+        if nb != len(it.get("bend", [])): bad.append(f"{it['name']}: 절곡선 {nb} ≠ {len(it.get('bend', []))}")
         circles = [g for g in it["inner"] + it["drill"] if g[0] == "circle"]
         polys = [g for g in it["inner"] if g[0] == "poly"]
         segs = [s for o in it["outer"] for s in zip(o[1], o[1][1:] + o[1][:1])] + \
@@ -292,25 +293,39 @@ def check_laser(items, out):
         for i, g in enumerate(circles):
             (cx, cy), r = g[1], g[2]
             if 2 * r < max(t, 1.0) - 1e-6: bad.append(f"{it['name']}: 구멍 Ø{2 * r:.1f} < 두께 {t}")
-            if segs:
-                m = min(seg_dist((cx, cy), a, b) for a, b in segs) - r
-                if m < t - 1e-6: bad.append(f"{it['name']}: Ø{2 * r:.1f} ({cx:.1f},{cy:.1f}) 모서리·개구까지 {m:.2f} < {t}")
+            m = min(seg_dist((cx, cy), a, b) for a, b in segs) - r
+            if m < t - 1e-6: bad.append(f"{it['name']}: Ø{2 * r:.1f} ({cx:.1f},{cy:.1f}) 모서리·개구까지 {m:.2f} < {t}")
             for h in circles[i + 1:]:
                 gap = ((cx - h[1][0]) ** 2 + (cy - h[1][1]) ** 2) ** 0.5 - r - h[2]
                 if gap < t - 1e-6: bad.append(f"{it['name']}: 구멍 ({cx:.1f},{cy:.1f})~({h[1][0]:.1f},{h[1][1]:.1f}) 간격 {gap:.2f} < {t}")
-        for g in polys:   # 사각 개구~외곽 상자
+        for g in polys:
             ox = [q[0] for o in it["outer"] for q in o[1]]; oy = [q[1] for o in it["outer"] for q in o[1]]
             gx = [q[0] for q in g[1]]; gy = [q[1] for q in g[1]]
             m = min(min(gx) - min(ox), max(ox) - max(gx), min(gy) - min(oy), max(oy) - max(gy))
             if m < t - 1e-6: bad.append(f"{it['name']}: 개구~모서리 {m:.2f} < {t}")
     if bad:
-        raise SystemExit("레이저 업체 규칙 검사 실패:\n  " + "\n  ".join(bad))
-    n = sum(1 for it in items if not it.get("bend"))
-    print(f"레이저 규칙 검사 통과: dxf_laser {n}장 (색 {{2,5,6}}, 구멍 ≥ 두께, 간격 ≥ 두께), 절곡 {len(items) - n}종은 step/")
+        raise SystemExit("알루미늄 묶음 규칙 검사 실패:\n  " + "\n  ".join(bad))
+    nb = sum(1 for it in items if it.get("bend"))
+    print(f"알루미늄 규칙 검사 통과: {len(items)}종 (평판 {len(items) - nb}, 절곡 {nb}), 색 {sorted(allowed)}, 구멍 ≥ 두께, 간격 ≥ 두께")
 
 
 def upload_file(it):
-    return f"step/{it['name']}.step" if it.get("bend") else f"dxf_laser/{it['name']}.dxf"
+    return f"step/{it['name']}.step + 2D도면.pdf" if it.get("bend") else f"dxf/{it['name']}.dxf + step/{it['name']}.step"
+
+
+def flat_step(it, fn):
+    """평판 STEP = DXF 그림을 두께만큼 밀어 올린 것"""
+    import cadquery as cq
+    t = thick_of(it)
+    s = None
+    for o in it["outer"]:
+        b = cq.Workplane("XY").polyline(o[1]).close().extrude(t)
+        s = b if s is None else s.union(b)
+    for g in it["inner"] + it["drill"]:
+        if g[0] == "circle": s = s.cut(cq.Workplane("XY").workplane(offset=-1).center(*g[1]).circle(g[2]).extrude(t + 2))
+        else: s = s.cut(cq.Workplane("XY").workplane(offset=-1).polyline(g[1]).close().extrude(t + 2))
+    cq.exporters.export(s, fn)
+    return s
 
 
 def l_angle_step(it, fn):
@@ -329,6 +344,7 @@ def l_angle_step(it, fn):
     return s
 
 
+
 def run_foamex(cad_module, outdir, version=""):
     items = items_from_parts(cad_module, FOAMEX)
     write_package(items, FOAMEX, os.path.join(str(outdir), "foamex"), version)
@@ -344,9 +360,84 @@ def bent_item(name, title, W, H, bend_at, holes, finished, qty, note):
                 note=note)
 
 
+def bent_multi(name, title, mat, W, H, bends, holes, inner, finished, note, qty=1, group=None):
+    """여러 번 접는 펼친 그림. bends = [((x0,y0),(x1,y1))], holes = [(x, y, d)], inner = [g]"""
+    t = re.search(r"([0-9.]+)\s*T", mat).group(1)
+    return dict(name=name, title=title, mat=mat, W=round(W, 2), H=round(H, 2), qty=qty, group=group or f"{t}T 절곡", mode="all",
+                face="펼친 그림", outer=[rect_poly(W, H)], inner=inner, drill=[("circle", (x, y), d / 2, None) for x, y, d in holes],
+                bend=bends, finished=finished, n_pockets=0, n_all=len(holes) + len(inner),
+                bend_note=f"BEND 90 deg at each BEND line. FINISHED OUTSIDE: {finished}. FLAT = SUM OF OUTSIDE DIMS - APPLY BEND DEDUCTION",
+                note=note)
+
+
+def part_len(H, prefix):
+    p = next(p for p in H.PARTS if p["name"].startswith(prefix))
+    bb = (p["shape"].val() if hasattr(p["shape"], "val") else p["shape"]).BoundingBox()
+    return round(max(bb.xlen, bb.ylen, bb.zlen), 2)
+
+
+def heater_items(H):
+    """히터 덕트 4종 (v3.3.0 상자형, v3.4.0 1T)"""
+    L = H.BX_Y1 - H.BX_Y0                                  # 덕트 길이 (y)
+    side = H.IZ1 - H.BX_Z0                                 # 몸통 옆벽 바깥 높이
+    bot = H.BX_X1 - H.BX_X0                                # 몸통 바닥 바깥 폭
+    mat = f"알루미늄 {H.HT:g}T"
+    items = []
+    # H06 몸통: X = y - BX_Y0, Y: 왼벽(위→아래) | 바닥(왼→오) | 오른벽(아래→위)
+    hs = [(y - H.BX_Y0, side + (x - H.BX_X0), 3.4) for x, y in H.DUCT_SO]
+    hs += [(y - H.BX_Y0, side + bot + (z - H.BX_Z0), 3.4) for y, z in H.th95_holes]
+    hs += [(165 - H.BX_Y0, side + bot + (H.FAN_C[1] - H.BX_Z0), H.KSD["cap_d"] + 1)]
+    Ht = 2 * side + bot
+    items.append(bent_multi("H06_heater_duct_Al1T", "히터 덕트 몸통 ㄷ자", mat, L, Ht,
+                            [((0, side), (L, side)), ((0, side + bot), (L, side + bot))], hs, [],
+                            f"U {bot:g} x {side:g} x L{L:g}", f"바닥 {bot:g} + 양옆 {side:g}, 길이 {L:g}. 오른벽 = 서모스탯 캡 Ø{H.KSD['cap_d'] + 1:g} + Ø3.4 ×2",
+                            group="1T 절곡 (히터 덕트)"))
+    top = bot + 2 * H.HT; f = H.FLG
+    items.append(bent_multi("H10_heater_duct_lid_Al1T", "히터 덕트 뚜껑", mat, L, top + 2 * f,
+                            [((0, f), (L, f)), ((0, f + top), (L, f + top))], [], [],
+                            f"top {top:g} x flange {f} x L{L:g}", f"위판 {top:g} + 날개 {f} ×2 (아래로 접기)", group="1T 절곡 (히터 덕트)"))
+    pw, ph = H.IX1 - H.IX0, H.IZ1 - H.IZ0
+    def plate(name, title, holes_xz, inner_xz, finished, note):
+        hs = [(f + (x - H.IX0), z - H.IZ0, d) for x, z, d in holes_xz]
+        inn = []
+        for g in inner_xz:
+            if g[0] == "circle": inn.append(("circle", (f + g[1][0] - H.IX0, g[1][1] - H.IZ0), g[2], None))
+            else: inn.append(("poly", [(f + x - H.IX0, z - H.IZ0) for x, z in g[1]], None))
+        return bent_multi(name, title, "알루미늄 1T", pw + 2 * f, ph, [((f, 0), (f, ph)), ((f + pw, 0), (f + pw, ph))], hs, inn,
+                          finished, note, group="1T 절곡 (히터 덕트)")
+    x0, z0, x1, z1 = H.WIN
+    items.append(plate("H09_ptc_window_plate_Al1T", "PTC 창판", [],      # v3.3.1: 장착 구멍은 직접
+                       [("poly", [(x0, z0), (x1, z0), (x1, z1), (x0, z1)])],
+                       f"plate {pw:g} x {ph:g}, flange {f} x2",
+                       f"개구 {x1 - x0:g}×{z1 - z0:g} [PTC 핀 면 가정]. 장착 구멍 없음 (PTC 대고 직접). 날개 {f} 2개 같은 쪽으로"))
+    items.append(plate("H11_heater_duct_end_Al1T", "히터 덕트 끝판 (팬 쪽)", [(x, z, 3.4) for x, z in H.FAN_HOLES],
+                       [("circle", H.FAN_C, H.DUCT_HOLE_R)], f"plate {pw:g} x {ph:g}, flange {f} x2",
+                       f"팬 Ø{2 * H.DUCT_HOLE_R:g} + Ø3.4 ×4. 날개 {f} 2개 같은 쪽으로"))
+    return items
+
+
+def e07_item(H):
+    """E07 65°C 서모스탯 받침 1T L자 (v3.4.0 묶음에 추가). 펼친 그림: 0~12 = 바닥 다리, 12~ = 세운 면"""
+    hw = H.E07_HW; W = 2 * hw; foot = 12.0
+    z0 = H.IN0 + H.T05                                    # 바닥 다리 아랫면
+    vh = (H.TH65_C[1] + 8) - z0                           # 세운 면 바깥 높이
+    Y = lambda z: foot + (z - z0)
+    X = lambda y: y - (H.TH65_C[0] - hw)
+    holes = [(X(H.st_hole[1]), foot - (H.st_x1 - H.st_hole[0]), 3.4)] + [(X(y), Y(z), 3.4) for y, z in H.th65_holes]
+    win = ("poly", [(X(H.TH65_C[0] - 8), Y(H.TH65_C[1] - 6)), (X(H.TH65_C[0] + 8), Y(H.TH65_C[1] - 6)),
+                    (X(H.TH65_C[0] + 8), Y(H.TH65_C[1] + 6)), (X(H.TH65_C[0] - 8), Y(H.TH65_C[1] + 6))], None)
+    return bent_multi("E07_thermostat65_bracket_Al1T", "65°C 서모스탯 받침 L자", "알루미늄 1T", W, foot + vh,
+                      [((0, foot), (W, foot))], holes, [win], f"L foot {foot:g} x upright {vh:g} x W{W:g}",
+                      f"바닥 다리 {foot:g} (Ø3.4 → 스탠드오프) + 세운 면 {vh:g} (창 16×12, 서모스탯 Ø3.4 ×2). 폭 {W:g}")
+
+
 def run_aluminum(cad_module, outdir, version=""):
     H = cad_module
+    vc = {k: int(v) for k, v in H.PARAMS["VENDOR_COLORS"].items() if k != "bom"}
     pk = dict(ALUMINUM)
+    pk["notes"] = [("DXF (AutoCAD 2000, mm, 1:1) 색·레이어: " + ", ".join(
+        f"{ACI_KO.get(vc[k], vc[k])}{' 점선' if k == 'bend' else ''} {AL_LAYER_NAMES[k]} = {AL_LEGEND_KO[k]}" for k in AL_LAYER_NAMES)
+        + ". 업체 색 규칙이 따로 있으면 알려 주세요 (바꿔 드림)") if n == "DXF_COLORS" else n for n in ALUMINUM["notes"]]
     tx, ty = H.TRAY_X, H.TRAY_Y
     pk["extra"] = [
         dict(name=f"T03_tray_cross_strip_X_Al1T_10x{tx - 2:g}", title="트레이 십자 띠 (가로)", W=float(tx - 2), H=10.0, qty=1,
@@ -361,126 +452,65 @@ def run_aluminum(cad_module, outdir, version=""):
     hv = (H.FLOOR_Z - 12) - (H.BAY_Z0 + H.T05)               # A12 세운 판 바깥 높이
     fl = 13.0                                              # A12 플랜지 바깥 (y124 ~ y137)
     items.append(bent_item("A12_outlet_baffle_Al1T_bent", "출구 배플", 64.0, fl + hv, fl,
-                           [(12.0, 6.0, 3.4), (52.0, 6.0, 3.4)], f"plate {hv:.1f} x flange {fl} x W64", 1,
-                           f"플랜지 {fl} (구멍 Ø3.4 ×2, 플랜지 끝에서 6, 옆 끝에서 12) + 세운 판 {hv:.1f}, 폭 64"))
-    # v3.2.0: 앵글 13조각을 1T L자 절곡으로도 (견적 비교용). 펼침 폭 20 = 바깥 10 + 10, 아래 다리 0~10 / 위 다리 10~20
+                           [(12.0, 6.0, 3.4), (52.0, 6.0, 3.4)], f"plate {hv:g} x flange {fl:g} x W64", 1,
+                           f"플랜지 {fl:g} (구멍 Ø3.4 ×2, 플랜지 끝에서 6, 옆 끝에서 12) + 세운 판 {hv:g}, 폭 64"))
+    items.append(e07_item(H))
+    # 앵글 13조각 → 1T L자 절곡 (길이는 CAD에서). 펼침 폭 20 = 바깥 10 + 10, 아래 다리 0~10 / 위 다리 10~20
     d0 = (H.FLOOR_Z + 1)                                  # A19 아래 끝
     strip0 = H.IN0 + H.T05 + 2 + 5                        # A14 앞 끝 (ty0 + 5)
-    ang = [  # (이름, 제목, 길이, 수량, 구멍[(x, 다리)], 메모)
-        ("A17_floor_angle_F", "바닥 받침 앞", 269.0, 1, [], "라이너에 중성 실리콘"),
-        ("A17_floor_angle_LR", "바닥 받침 좌·우", 214.5, 2, [], "라이너에 중성 실리콘"),
-        ("A17_floor_angle_LB_RB", "바닥 받침 뒤 조각", 12.5, 2, [], "짧아서 어려우면 제외"),
-        ("A20_duct_floor_angle", "덕트 벽 아래 받침", 247.0, 1, [], "A16에 리벳 (겹쳐 뚫기)"),
+    ang = [  # (이름, 제목, CAD 접두어 또는 길이, 수량, 구멍[(x, 다리)], 메모)
+        ("A17_floor_angle_F", "바닥 받침 앞", "A17_floor_angle_F", 1, [], "라이너에 중성 실리콘"),
+        ("A17_floor_angle_LR", "바닥 받침 좌·우", "A17_floor_angle_L", 2, [], "라이너에 중성 실리콘"),
+        ("A17_floor_angle_LB_RB", "바닥 받침 뒤 조각", "A17_floor_angle_LB", 2, [], "짧아서 어려우면 제외"),
+        ("A20_duct_floor_angle", "덕트 벽 아래 받침", "A20_duct_floor_angle", 1, [], "A16에 리벳 (겹쳐 뚫기)"),
         ("T03_frame_long", "트레이 프레임 긴 변", float(H.TRAY_X), 2, [], "맞대기 + 모서리 판 리벳"),
         ("T03_frame_short", "트레이 프레임 짧은 변", round(H.TRAY_Y - 20, 2), 2, [], "긴 변 사이 맞대기"),
-        ("A14_tray_gap_strip", "트레이 옆 틈막이", 229.0, 2, [(y - strip0, "wall") for y in H.STRIP_BOLTS_Y],
+        ("A14_tray_gap_strip", "트레이 옆 틈막이", "A14_tray_gap_strip_L", 2, [(y - strip0, "wall") for y in H.STRIP_BOLTS_Y],
          "벽 다리 구멍 = 앞 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
-        ("A19_duct_wall_angle", "덕트 벽 세로 받침", round(H.DUCT_TOP - d0, 2), 2, [(z - d0, "wall") for z in H.DUCTANG_Z],
+        ("A19_duct_wall_angle", "덕트 벽 세로 받침", "A19_duct_wall_angle_L", 2, [(z - d0, "wall") for z in H.DUCTANG_Z],
          "벽 다리 구멍 = 아래 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
-        ("A18_partition_angle", "칸막이 받침", 20.0, 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
+        ("A18_partition_angle", "칸막이 받침", "A18_partition_angle_1", 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
     ]
-    for nm, title, L, q, holes, note in ang:
+    for nm, title, src, q, holes, note in ang:
+        L = part_len(H, src) if isinstance(src, str) else src
         hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
         it = bent_item(f"{nm}_Al1T_L10x10_{L:g}", title, L, 20.0, 10.0, hs, f"L 10x10 (outside) x {L:g}", q,
                        f"앵글 10×10×1 대신 1T 절곡. {note}. 구멍 다리: 아래 반쪽(0~10) = 바닥/첫 다리, 위 반쪽(10~20) = 벽 다리")
         it["group"] = "1T 절곡 (앵글 대신)"
         items.append(it)
+    items += heater_items(H)
     out = os.path.join(str(outdir), "aluminum")
-    write_package(items, pk, out, version)
-    write_laser(items, out)
-    os.makedirs(os.path.join(out, "step"))
-    import cadquery as cq
-    src = {"A12_outlet_baffle_Al1T_bent": "A12_outlet_baffle_Al1T_64x56"}
-    shapes = {p["name"]: p["shape"] for p in H.PARTS}
+    if os.path.isdir(out): shutil.rmtree(out)
+    for sub in ("dxf", "step"): os.makedirs(os.path.join(out, sub))
+    check_items(items)
     for it in items:
-        if not it.get("bend"): continue
+        write_al_dxf(it, os.path.join(out, "dxf", f"{it['name']}.dxf"), vc, version)
+    import cadquery as cq
+    shapes = {p["name"]: p["shape"] for p in H.PARTS}
+    shapes["A12_outlet_baffle_Al1T_bent"] = shapes["A12_outlet_baffle_Al1T_64x56"]
+    shapes["H09_ptc_window_plate_Al1T"] = H.H09_VENDOR
+    for it in items:
         fn = os.path.join(out, "step", it["name"] + ".step")
-        if it["name"] in src: cq.exporters.export(shapes[src[it["name"]]], fn)
+        if not it.get("bend"): flat_step(it, fn)
+        elif it["name"] in shapes: cq.exporters.export(shapes[it["name"]], fn)
         else: l_angle_step(it, fn)
-    check_laser(items, out)
+    write_pdf(items, pk, os.path.join(out, "2D도면.pdf"), version)
+    write_xlsx(items, pk, os.path.join(out, "발주표.xlsx"), version)
+    json.dump([{k: it[k] for k in ("name", "title", "mat", "W", "H", "group", "qty")}
+               | {"proc": proc_of(it), "drill": drill_summary(it["drill"]), "inner": len(it["inner"]), "outer": len(it["outer"]),
+                  "bends": len(it.get("bend", []))}
+               for it in items], open(os.path.join(out, "summary.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    for it in items:
+        print(f"{it['group']:16s} {it['name']:42s} {it['W']:g}x{it['H']:g} x{it['qty']}  {proc_of(it)}  inner {len(it['inner'])}  drill {drill_summary(it['drill'])}")
+    check_al(items, out, vc)
     a10 = next(it for it in items if it["name"].startswith("A10"))
     print("A10 구멍:", drill_summary(a10["drill"]))
     return items
 
 
-# ---------------------------------------------------------------- 알루미늄 2차 (v3.3.0: 상자형 히터 덕트)
-ALUMINUM2 = dict(
-    key="aluminum", title="알루미늄 2차 (히터 덕트)",
-    material="알루미늄 판 (업체 기본 재질), 0.5T·1T",
-    groups=[], spare={}, extra=[],
-    notes=[
-        "히터 덕트 4종, 전부 절곡 부품 → 업체에는 step/ 만 올림 (발주표 '올릴 파일' 열). dxf/는 펼친 그림 확인용",
-        "치수는 접은 뒤 바깥 치수. 펼친 그림은 바깥 치수 합(굽힘 공제 전) — 전개는 업체 기준. 모두 90° 접기",
-        "H06 몸통 0.5T ㄷ자(2번), H10 뚜껑 0.5T(2번), H09 PTC 창판 1T(2번), H11 끝판 1T(2번)",
-        "리벳 구멍은 없음 (조립 때 겹쳐 뚫음). 공차 ±0.3mm, 버 제거, 부품 이름 표시",
-        "1차 묶음과 같이 발주해도 됨 (v3.3.1). H09 창판은 장착 구멍 없이 개구만 — 구멍 4개는 PTC를 받아 대고 직접 뚫음",
-        "H09 개구 56×28은 PTC 핀 면 [가정]: 크면 알루미늄 테이프로 막고, 작으면 줄로 넓힘",
-    ],
-    footer="H09 장착 구멍(Ø3.4 ×4, 피치 86×24 가정)은 업체 가공에서 뺌 → 확인도면에 안 나옴. PTC 실물에 대고 표시 후 직접",
-)
-
-
-def bent_multi(name, title, mat, W, H, bends, holes, inner, finished, note):
-    """여러 번 접는 펼친 그림. bends = [((x0,y0),(x1,y1))], holes = [(x, y, d)], inner = [g]"""
-    t = re.search(r"([0-9.]+)\s*T", mat).group(1)
-    return dict(name=name, title=title, mat=mat, W=round(W, 2), H=round(H, 2), qty=1, group=f"{t}T 절곡", mode="all",
-                face="펼친 그림", outer=[rect_poly(W, H)], inner=inner, drill=[("circle", (x, y), d / 2, None) for x, y, d in holes],
-                bend=bends, finished=finished, n_pockets=0, n_all=len(holes) + len(inner),
-                bend_note=f"BEND 90 deg at each BEND line. FINISHED OUTSIDE: {finished}. FLAT = SUM OF OUTSIDE DIMS - APPLY BEND DEDUCTION",
-                note=note)
-
-
-def run_aluminum2(cad_module, outdir, version=""):
-    H = cad_module
-    L = H.BX_Y1 - H.BX_Y0                                  # 덕트 길이 (y)
-    side = H.IZ1 - H.BX_Z0                                 # 몸통 옆벽 바깥 높이
-    bot = H.BX_X1 - H.BX_X0                                # 몸통 바닥 바깥 폭
-    items = []
-    # H06 몸통: X = y - BX_Y0, Y: 왼벽(위→아래) | 바닥(왼→오) | 오른벽(아래→위)
-    hs = [(y - H.BX_Y0, side + (x - H.BX_X0), 3.4) for x, y in H.DUCT_SO]
-    hs += [(y - H.BX_Y0, side + bot + (z - H.BX_Z0), 3.4) for y, z in H.th95_holes]
-    hs += [(165 - H.BX_Y0, side + bot + (H.FAN_C[1] - H.BX_Z0), H.KSD["cap_d"] + 1)]
-    W, Ht = L, 2 * side + bot
-    items.append(bent_multi("H06_heater_duct_Al05", "히터 덕트 몸통 ㄷ자", "알루미늄 0.5T", W, Ht,
-                            [((0, side), (W, side)), ((0, side + bot), (W, side + bot))], hs, [],
-                            f"U {bot:.1f} x {side:.1f} x L{L:g}", f"바닥 {bot:.1f} + 양옆 {side:.1f}, 길이 {L:g}. 오른벽 = 서모스탯 캡 Ø17 + Ø3.4 ×2"))
-    # H10 뚜껑
-    top = bot + 2 * H.HT; f = H.FLG
-    items.append(bent_multi("H10_heater_duct_lid_Al05", "히터 덕트 뚜껑", "알루미늄 0.5T", L, top + 2 * f,
-                            [((0, f), (L, f)), ((0, f + top), (L, f + top))], [], [],
-                            f"top {top:.1f} x flange {f} x L{L:g}", f"위판 {top:.1f} + 날개 {f} ×2 (아래로 접기)"))
-    # H09 창판 / H11 끝판: X = 날개 | 판(x - IX0) | 날개, Y = z - IZ0
-    pw, ph = H.IX1 - H.IX0, H.IZ1 - H.IZ0
-    def plate(name, title, holes_xz, inner_xz, finished, note):
-        hs = [(f + (x - H.IX0), z - H.IZ0, d) for x, z, d in holes_xz]
-        inn = []
-        for g in inner_xz:
-            if g[0] == "circle": inn.append(("circle", (f + g[1][0] - H.IX0, g[1][1] - H.IZ0), g[2], None))
-            else: inn.append(("poly", [(f + x - H.IX0, z - H.IZ0) for x, z in g[1]], None))
-        Wp = pw + 2 * f
-        return bent_multi(name, title, "알루미늄 1T", Wp, ph, [((f, 0), (f, ph)), ((f + pw, 0), (f + pw, ph))], hs, inn, finished, note)
-    x0, z0, x1, z1 = H.WIN
-    items.append(plate("H09_ptc_window_plate_Al1T", "PTC 창판", [],      # v3.3.1: 장착 구멍은 직접
-                       [("poly", [(x0, z0), (x1, z0), (x1, z1), (x0, z1)])],
-                       f"plate {pw:.1f} x {ph:.1f}, flange {f} x2",
-                       f"개구 {x1 - x0:g}×{z1 - z0:g} [PTC 핀 면 가정]. 장착 구멍 없음 (PTC 대고 직접). 날개 {f} 2개 같은 쪽으로"))
-    items.append(plate("H11_heater_duct_end_Al1T", "히터 덕트 끝판 (팬 쪽)", [(x, z, 3.4) for x, z in H.FAN_HOLES],
-                       [("circle", H.FAN_C, 28.5)], f"plate {pw:.1f} x {ph:.1f}, flange {f} x2",
-                       f"팬 Ø57 + Ø3.4 ×4. 날개 {f} 2개 같은 쪽으로"))
-    out = os.path.join(str(outdir), "aluminum2")
-    write_package(items, ALUMINUM2, out, version)
-    os.makedirs(os.path.join(out, "step"))
-    import cadquery as cq
-    shapes = {p["name"]: p["shape"] for p in H.PARTS}
-    shapes["H09_ptc_window_plate_Al1T"] = H.H09_VENDOR
-    for it in items:
-        cq.exporters.export(shapes[it["name"]], os.path.join(out, "step", it["name"] + ".step"))
-    check_laser(items, out)
-    return items
-
-
 def run(cad_module, outdir, version=""):
-    return run_foamex(cad_module, outdir, version) + run_aluminum(cad_module, outdir, version) + run_aluminum2(cad_module, outdir, version)
+    return run_foamex(cad_module, outdir, version) + run_aluminum(cad_module, outdir, version)
+
 
 
 def feat_xy(g):
@@ -507,8 +537,12 @@ def write_pdf(items, pk, fn, version):
             W, H = it["W"], it["H"]
             for o in it["outer"]:
                 xs = [q[0] for q in o[1]] + [o[1][0][0]]; ys = [q[1] for q in o[1]] + [o[1][0][1]]; ax.plot(xs, ys, "k-", lw=1)
-            for (a, b) in it.get("bend", []):
-                ax.plot([a[0], b[0]], [a[1], b[1]], "b--", lw=1); ax.text(b[0] + 1, b[1], "접는 선 90°", color="b", fontsize=8, va="center")
+            blines = []
+            for bi, (a, b) in enumerate(it.get("bend", []), 1):
+                ax.plot([a[0], b[0]], [a[1], b[1]], "b--", lw=1)
+                pos = f"Y = {a[1]:g}" if abs(a[1] - b[1]) < 1e-6 else f"X = {a[0]:g}"
+                ax.text(b[0] + 1, b[1], f"B{bi} ({pos})", color="b", fontsize=8, va="center")
+                blines.append(f"B{bi}: {pos}")
             rows = []
             feats = [("C", g, "g") for g in it["inner"]] + [("D", g, "r") for g in it["drill"]]
             feats.sort(key=lambda t: (t[0], round(feat_xy(t[1])[1]), feat_xy(t[1])[0]))
@@ -537,7 +571,7 @@ def write_pdf(items, pk, fn, version):
             fig.text(0.06, 0.94, f"{it['name']}  {it['title']}   {it['mat']}   {W}×{H}  수량 {it['qty']}   [{it['group']}: {proc_of(it)}]   {version}", fontsize=10.5)
             if it.get("bend"):
                 fig.text(0.06, 0.91, f"펼친 그림 (바깥 치수 합, 굽힘 공제 전 — 전개는 업체 기준).  접은 뒤 바깥 치수: {it['finished']}", fontsize=8.5, color="b")
-                fig.text(0.06, 0.885, it.get("note", ""), fontsize=8.5, color="b")
+                fig.text(0.06, 0.885, f"절곡선 (90°, 점선): {', '.join(blines)}   — {it.get('note', '')}", fontsize=8.5, color="b")
             else:
                 fig.text(0.06, 0.91, f"그림 = {it['face']} (이 면이 위로 오게 가공).  좌표 원점 = 그림의 왼쪽 아래 모서리(검은 점), X 오른쪽 +, Y 위쪽 +, 단위 mm", fontsize=8.5, color="b")
                 if it.get("note"): fig.text(0.06, 0.885, it["note"], fontsize=8.5, color="b")
@@ -553,7 +587,7 @@ def write_pdf(items, pk, fn, version):
                 for r_ in rows:
                     fig.text(tx, ty, f"{r_[0]:<4} {r_[1]:<4} {r_[2]:<12} {r_[3]:>7} {r_[4]:>7}", fontsize=7.5); ty -= 0.021
             fig.text(tx, 0.06, "원 = 중심 좌표, 사각 = 중심 좌표 (크기는 가로×세로)\nDXF에도 같은 좌표가 그대로 들어 있음", fontsize=7)
-            fig.text(0.06, 0.04, "검정 = 외곽, 초록 = 안쪽 개구부, 빨강 = 드릴, 파랑 점선 = 접는 선"
+            fig.text(0.06, 0.04, "검정 = 외곽, 초록 = 안쪽 개구부, 빨강 = 드릴, 파랑 점선 = 접는 선 (이 PDF 색은 DXF 색과 다름)"
                      + (f"   (CAD 구멍 {it['n_all']}개 중 업체 가공 {len(it['inner']) + len(it['drill'])}개, 포켓 {it['n_pockets']}개는 직접)" if it['n_all'] or it['n_pockets'] else ""), fontsize=8)
             pdf.savefig(fig); plt.close(fig)
 

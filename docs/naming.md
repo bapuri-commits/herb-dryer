@@ -2,17 +2,17 @@
 
 STEP·도면·STL·이슈에서 부품을 부를 때 이 이름을 쓴다. Fusion에서 STEP을 열면 브라우저 트리에 같은 이름으로 보인다.
 
-형식: `<접두어><번호>_<설명>[_<재료·치수>]` — 예: `P02_front_foamex5T`, `H06_heater_duct_Al05`
+형식: `<접두어><번호>_<설명>[_<재료·치수>]` — 예: `P02_front_foamex5T`, `H06_heater_duct_Al1T`
 
 | 접두어 | 분류 | 예 |
 |---|---|---|
 | **P** | 포맥스 외판 | `P01_side_L_foamex5T`, `P06_bottom_plate_foamex5T` |
 | **F** | 단열 폼 | `F01_foam_bottom_270x270` |
-| **A** | 알루미늄 (라이너 0.5T, 타공판·칸막이·덕트 벽·배플 1T, 받침 앵글 10×10×1) | `A04_liner_ch_L_270x171.5`, `A15_bay_partition_Al1T_269x64.5`, `A16_duct_wall_Al1T_267x141`, `A17_floor_angle_F` |
+| **A** | 알루미늄 (v3.4.0 전부 1T: 라이너·타공판·칸막이·덕트 벽·배플, 받침 L자 10×10) | `A04_liner_ch_L_Al1T_270x171`, `A15_bay_partition_Al1T_268x64`, `A16_duct_wall_Al1T_266x141`, `A17_floor_angle_F` |
 | **B** | 블록 (너트블록·코너블록, 3D 프린트) | `B01_nut_block_bottom_L_30`, `B02_corner_block_top_10_10` |
 | **D** | 문 (바깥판, 플러그, 가스켓, 자석, 경첩, 손잡이) | `D01_door_outer_foamex5T`, `D07_door_pull_handle_96` |
 | **E** | 전장 (측면 박스 안: ESP32, 모듈, WAGO, LCD, 버튼, 퓨즈) | `E01_ESP32_38pin_expansion_board`, `E04_MOS_3_DFR0457`, `E12_inline_fuse_holder` |
-| **H** | 히터 (60mm 순환팬, 알루미늄 덕트, PTC, 서모스탯) | `H06_heater_duct_Al05`, `H09_ptc_window_plate_Al1T`, `H12_ceramic_terminal_2P` |
+| **H** | 히터 (60mm 순환팬, 알루미늄 덕트, PTC, 서모스탯) | `H06_heater_duct_Al1T`, `H09_ptc_window_plate_Al1T`, `H12_ceramic_terminal_2P` |
 | **I** | 흡기 (뒷판 흡기 박스, 40mm 팬, 바깥 활성탄 커버, BME688 #2) | `I01_intake_box_PETG`, `I06_intake_carbon_cover_PETG` |
 | **K** | 측면 전장 박스 (포맥스 판, 코너 블록, 벽 관통 글랜드) | `K01_sidebox_front_foamex5T`, `K06_sidebox_mount_plate_foamex5T`, `K20_gland_PG9_bay_power` |
 | **L** | 로드셀 (블록, 로드셀, 받침판) | `L01_loadcell_base_block`, `L02_loadcell_1kg_bar` |
