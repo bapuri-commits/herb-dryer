@@ -6,7 +6,7 @@ v3.0 (메이저): 회로를 본체 오른쪽 측면 박스(K)로 분리, 공기 
 펠티어(2차) 완전 제외, 덕트 깊이 20, 칸막이·덕트 벽·히터 덕트 알루미늄화, 흡기를 뒷판(복귀실)으로.
 v3.1: TCS34725·LED·천장 센서 인서트·부저 삭제, 전장부 관통구를 PG9 전력/신호 2개로 분리,
 흡기: 활성탄을 뒷판 바깥 커버(차가운 쪽)로, BME688 #2를 관 옆벽 홈(흐름과 나란히), 출구-칸막이 20mm.
-v3.2: 트레이 메시를 바닥 다리·십자 띠 위로, 라이너 구멍 업체 가공(M3 Ø4.0, 케이블 Ø12 + 실리콘 그로밋).
+v3.2: 트레이 메시를 바닥 다리·십자 띠 위로, 라이너 구멍 업체 가공(M3 Ø4.0, 케이블 Ø12 → v3.5 Ø16 + 실리콘 그로밋).
 
 v2.8 → v2.9 주요 변경
 - 순환 구조: 덕트 벽을 전장부 바닥까지 내려 '플레넘(앞)'과 '복귀실(뒤)'로 분리.
@@ -96,7 +96,7 @@ PTC = PARAMS["PTC"]                            # [실측] PTC 핀 (w=귀 포함 
 EXP = PARAMS["EXP"]                            # [실측] ESP32 38핀 확장보드 (판매처마다 68~78×53~63)
 DEVKIT = dict(w=27.9, d=54.4, t=1.6)           # ESP32 DevKitC V4 (공식 54.4×27.9)
 LCD = PARAMS["LCD"]                            # [실측] LCD1602 + I2C 백팩
-LC = PARAMS["LC"]                              # [실측] 1kg 바형 로드셀 (M4/M5 확인)
+LC = PARAMS["LC"]                              # 1kg 바형 로드셀 VLT-LCS002 (고정 쪽 M5, 트레이 쪽 M4)
 MOD = PARAMS["MOD"]                            # [실측] 캐리어 판 위 소형 모듈 (가로×세로×높이)
 HINGE = PARAMS["HINGE"]                        # [실측] 25mm 소형 경첩
 USBP = PARAMS["USB"]                           # 마이크로USB 패널마운트 Adafruit 3258
@@ -158,6 +158,8 @@ def bolt(name, axis, c, head_at, direction, L, d=3, head="pan", spec=None):
     hd, hh = (5.5, 2.4) if head == "pan" else (6.0, 1.7)
     if d == 4:
         hd, hh = (7.0, 2.8) if head == "pan" else (8.0, 2.3)
+    if d == 5:
+        hd, hh = (9.5, 3.5) if head == "pan" else (9.5, 2.7)
     r = d / 2 - 0.05
     if direction > 0:
         sh = cyl(axis, c, r, head_at, head_at + L)
@@ -207,6 +209,7 @@ BP_X0, BP_X1 = OUT, OUT + WALL                 # 측면 박스 세로 장착판 
 
 # 오른쪽 옆판 관통구 (y, z) — 본체 ↔ 측면 박스
 PT1P = (22, 33)           # 전장부 전력: PTC 2, 팬 전원 4 (PG9)
+PT1P_LINER = (PT1P[0] + 8, PT1P[1])   # v3.5.0: 라이너 Ø16 구멍만 뒤로 8 — 그로밋 플랜지(반지름 약 11 [가정])가 앞 라이너 A03에 안 닿게 (구멍~판 앞 모서리 7)
 PT1S = (42, 57)           # 전장부 신호: 팬 PWM·타코 4, DS18B20 3, 로드셀 4, BME688 #2 4 (PG9)
 PG9 = PARAMS["PG9"]                       # PG9 글랜드: 장착 구멍, 너트 외경 (params.yaml)
 PT3 = (215, 237)          # 전실: BME688 #1 (PG7)
@@ -304,6 +307,7 @@ def side_foam_cuts(fm, xa, xb, right):
     if right:
         for p in PTS:
             fm = fm.cut(cyl("x", p, gl_nut(p) / 2 + 2, xa - 1, xb + 1))
+        fm = fm.cut(cyl("x", PT1P_LINER, PARAMS["LINER"]["cable_d"] / 2 + 1, xa - 1, xb + 1))   # v3.5.0: 뒤로 옮긴 라이너 구멍까지 (Ø28 + 뒤쪽 2 넓힘)
         for p in (SHT_P, BME1_P):
             fm = fm.cut(cyl("x", p, 4, xa - 1, xb + 1))
     return fm
@@ -340,8 +344,7 @@ for (x, y) in TOP_SCREWS:
 z_ch0 = FLOOR_TOP + LINER_GAP          # 83
 LINER = PARAMS["LINER"]
 LB_R = LINER["bolt_d"] / 2             # 라이너 M3 구멍 (v3.2.0 Ø4.0)
-LC_R = LINER["cable_d"] / 2            # 라이너 케이블 구멍 + 실리콘 그로밋 (v3.2.0 Ø12)
-PT1P_LINER = (PT1P[0] + 4, PT1P[1])    # Ø12면 앞 모서리까지 1mm라 라이너 구멍만 뒤로 4 (폼 구멍 Ø28 안, 모서리 5mm)
+LC_R = LINER["cable_d"] / 2            # 라이너 케이블 구멍 + 실리콘 그로밋 (v3.5.0 Ø16)
 def dname(prefix, shape):
     """이름 끝 치수 = 실제 판 크기 (큰 두 변, 0.5 단위)"""
     bb = shape.val().BoundingBox()
@@ -390,7 +393,7 @@ part = part.cut(cyl("y", FAN_C, 28.5, PART_Y0 - 1, PART_Y1 + 1))
 for p in FAN_HOLES:
     part = part.cut(cyl("y", p, 1.7, PART_Y0 - 1, PART_Y1 + 1))
 WIRE_PASS = (250, 30)                         # 복귀실(흡기팬·BME688 #2) → 플레넘 배선 (그로밋)
-part = part.cut(cyl("y", WIRE_PASS, 6, PART_Y0 - 1, PART_Y1 + 1))
+part = part.cut(cyl("y", WIRE_PASS, LC_R, PART_Y0 - 1, PART_Y1 + 1))   # v3.5.0: 라이너와 같은 그로밋 Ø16
 add(dname("A15_bay_partition_Al1T", part), part, C_AL, "알루미늄 1T", "재단",
     note="플레넘/복귀실 칸막이. 아래 앵글 2개로 스탠드오프에 고정, 둘레는 중성 실리콘")
 PANG_X = (110, 220)
@@ -465,8 +468,10 @@ LC_CABLE = (LC_X0 - 8, CH_CY)
 floor = floor.cut(cyl("z", LC_CABLE, 3, FLOOR_Z - 1, FLOOR_TOP + 1))
 lc_base_holes = [(LC_X0 + LC["hole_end"], CH_CY), (LC_X0 + LC["hole_end"] + LC["hole_sp"], CH_CY)]
 lc_tray_holes = [(LC_X0 + LC["L"] - LC["hole_end"], CH_CY), (LC_X0 + LC["L"] - LC["hole_end"] - LC["hole_sp"], CH_CY)]
+LC_BASE_R = LC["thread_base"] / 2 + 0.25             # v3.5.0: 고정 쪽 M5 → 관통 Ø5.5
+LC_TRAY_R = LC["thread_tray"] / 2 + 0.25             # 트레이 쪽 M4 → 관통 Ø4.5
 for p in lc_base_holes:
-    floor = floor.cut(cyl("z", p, 2.25, FLOOR_Z - 1, FLOOR_TOP + 1))
+    floor = floor.cut(cyl("z", p, LC_BASE_R, FLOOR_Z - 1, FLOOR_TOP + 1))
 add("A10_perforated_floor_Al1T", floor, C_AL, "알루미늄 1T", "재단+타공",
     note=f"Ø4 {len(pts)}개 + 로드셀 자리 둘레 Ø5 {len(pts5)}개, 10mm 피치. 칸막이 뒤(y>236)는 막힘")
 
@@ -474,23 +479,25 @@ blk_h1, blk_h2 = 15, 20
 lc_z0 = FLOOR_TOP + blk_h1
 base_blk = box(LC_X0, CH_CY - 10, FLOOR_TOP, LC_X0 + 25, CH_CY + 10, lc_z0)
 for p in lc_base_holes:
-    base_blk = base_blk.cut(cyl("z", p, 2.25, FLOOR_TOP - 1, lc_z0 + 1))
+    base_blk = base_blk.cut(cyl("z", p, LC_BASE_R, FLOOR_TOP - 1, lc_z0 + 1))
 add("L01_loadcell_base_block", base_blk, C_PETG, "PETG", "3D프린트")
 cell = box(LC_X0, CH_CY - LC["s"] / 2, lc_z0, LC_X0 + LC["L"], CH_CY + LC["s"] / 2, lc_z0 + LC["s"])
-for p in lc_base_holes + lc_tray_holes:
-    cell = cell.cut(cyl("z", p, LC["thread"] / 2 - 0.05, lc_z0 - 1, lc_z0 + LC["s"] + 1))
-add("L02_loadcell_1kg_bar", cell, (0.75, 0.75, 0.8), kind="buy")
+for ps_, th in ((lc_base_holes, LC["thread_base"]), (lc_tray_holes, LC["thread_tray"])):
+    for p in ps_:
+        cell = cell.cut(cyl("z", p, th / 2 - 0.05, lc_z0 - 1, lc_z0 + LC["s"] + 1))
+add("L02_loadcell_1kg_bar", cell, (0.75, 0.75, 0.8), kind="buy", note="Voltly VLT-LCS002 1kg, 80×12.7, 고정 쪽(전선 쪽) 2-M5 / 트레이 쪽 2-M4, 끝에서 5")
 tz0 = lc_z0 + LC["s"]
-tray_blk = box(LC_X0 + LC["L"] - 25, CH_CY - 10, tz0, LC_X0 + LC["L"], CH_CY + 10, tz0 + blk_h2)
+TRAY_BLK_EXT = 3                                     # v3.5.0: 구멍이 끝에서 5라 머리 묻힘 Ø7.5 끝 벽 1.25 → 블록을 바깥으로 3 늘림 (4.25)
+tray_blk = box(LC_X0 + LC["L"] - 25, CH_CY - 10, tz0, LC_X0 + LC["L"] + TRAY_BLK_EXT, CH_CY + 10, tz0 + blk_h2)
 for p in lc_tray_holes:
-    tray_blk = tray_blk.cut(cyl("z", p, 2.25, tz0 - 1, tz0 + blk_h2 + 1))
+    tray_blk = tray_blk.cut(cyl("z", p, LC_TRAY_R, tz0 - 1, tz0 + blk_h2 + 1))
     tray_blk = tray_blk.cut(cyl("z", p, 3.75, tz0 + blk_h2 - 4, tz0 + blk_h2 + 1))
 add("L03_loadcell_tray_block", tray_blk, C_PETG, "PETG", "3D프린트")
 for i, p in enumerate(lc_base_holes):
-    bolt(f"L_bolt_base_{i}", "z", p, FLOOR_Z, +1, 25, d=4, spec="M4×25 냄비머리 볼트 (로드셀) [실측: M4/M5]")
+    bolt(f"L_bolt_base_{i}", "z", p, FLOOR_Z, +1, 25, d=LC["thread_base"], spec=f"M{LC['thread_base']:g}×25 냄비머리 볼트 (로드셀 고정 쪽)")
 for i, p in enumerate(lc_tray_holes):
-    bolt(f"L_bolt_tray_{i}", "z", p, tz0 + blk_h2 - 4, -1, 30, d=4, head="flat",
-         spec="M4×30 볼트 (로드셀, 머리 묻힘) [실측: M4/M5]")
+    bolt(f"L_bolt_tray_{i}", "z", p, tz0 + blk_h2 - 4, -1, 30, d=LC["thread_tray"], head="flat",
+         spec=f"M{LC['thread_tray']:g}×30 볼트 (로드셀 트레이 쪽, 머리 묻힘)")
 sz0 = tz0 + blk_h2
 add("A11_loadcell_shield_Al1T_100x40", box(CH_CX - 50, CH_CY - 20, sz0, CH_CX + 50, CH_CY + 20, sz0 + 1), C_AL, "알루미늄 1T", "재단",
     note="L04와 함께 트레이 블록 윗면에 중성 실리콘으로 접착 (PVC 본드·순간접착제 금지)")
@@ -802,18 +809,22 @@ for i, p in enumerate(DUCT_SO):
     add(f"H06_spacer_washer_{i}", cyl("z", p, 3.5, IN0 + T05, BX_Z0).cut(cyl("z", p, 1.6, IN0, BX_Z0 + 1)), C_BOLT, kind="fastener")
     count("M3 평와셔 (덕트 스페이서)", 3)
     bolt(f"H06_bolt_{i}", "z", p, IZ0, -1, 8, spec="M3×8 냄비머리 볼트 (덕트 바닥 → 스탠드오프)")
-# H12 PTC 리드선 연장 세라믹 단자대 2P (전장부 바닥, PG9 전력 글랜드 근처). 크기 [가정]
+# H12 PTC 리드선 연장 세라믹 단자대 TLB-700-2P-TS (v3.5.0): 21×18×15.6, 가운데 1점 고정 (Ø4.5 관통 + 자리파기 Ø7.5×5)
+#   21 변 = y (L·N 두 극), 18 변 = x (같은 극 나사 2개, 전선이 ±x 면으로 들어감): +x 면 = PG9 전력 글랜드 쪽, −x 면 = PTC 리드선
 CT = PARAMS["CTERM"]
 ct_x, ct_y = 245, 45
-ct = box(ct_x - CT["l"] / 2, ct_y - CT["w"] / 2, IN0 + T05, ct_x + CT["l"] / 2, ct_y + CT["w"] / 2, IN0 + T05 + CT["h"])
-CT_HOLES = [(ct_x + sx * CT["hole_sp"] / 2, ct_y) for sx in (-1, 1)]
-for p in CT_HOLES:
-    ct = ct.cut(cyl("z", p, 1.7, IN0, IN0 + T05 + CT["h"] + 1))
-add("H12_ceramic_terminal_2P", ct, (0.95, 0.95, 0.9), kind="buy",
-    note="PTC 리드선 200mm → 실리콘 18AWG 연장. 세라믹·황동만 (공기 통로 원칙). 크기 도착 후 실측")
-for i, p in enumerate(CT_HOLES):
-    so(f"H12_so_{i}", p[0], p[1], 10)
-    bolt(f"H12_bolt_{i}", "z", p, IN0 + T05 + CT["h"], -1, CT["h"] + 6, spec=f"M3×{CT['h'] + 6:g} 냄비머리 볼트 (세라믹 단자대)")
+ct_z0 = IN0 + T05
+ct = box(ct_x - CT["w"] / 2, ct_y - CT["l"] / 2, ct_z0, ct_x + CT["w"] / 2, ct_y + CT["l"] / 2, ct_z0 + CT["h"])
+ct = ct.cut(cyl("z", (ct_x, ct_y), CT["hole_d"] / 2, ct_z0 - 1, ct_z0 + CT["h"] + 1))
+ct = ct.cut(cyl("z", (ct_x, ct_y), CT["cbore_d"] / 2, ct_z0 + CT["h"] - CT["cbore_h"], ct_z0 + CT["h"] + 1))
+add("H12_ceramic_terminal_TLB700_2P", ct, (0.95, 0.95, 0.9), kind="buy",
+    note="TLB-700-2P-TS (디바이스마트 39399). PTC 리드선 200mm → 실리콘 18AWG 연장, 조임 M3 ×4 0.5Nm, 탈피 5~6mm. "
+         "한 점 고정이라 돌 수 있음 → 볼트 조일 때 방향(전선 면이 ±x) 맞춰 잡고 조임, 필요하면 중성 실리콘 한 점")
+CT_LEDGE = ct_z0 + CT["h"] - CT["cbore_h"]              # 나사 머리가 앉는 턱 (바닥에서 10.6)
+_lmin, _lmax = CT_LEDGE - (SO_Z + 10) + 4, CT_LEDGE - SO_Z - 1   # 스탠드오프(SO_Z ~ +10)에 4 이상, 바닥 1 전까지
+CT_BOLT_L = next(L for L in (6, 8, 10, 12, 16, 20, 25, 30) if _lmin <= L <= _lmax)
+so("H12_so_0", ct_x, ct_y, 10)
+bolt("H12_bolt_0", "z", (ct_x, ct_y), CT_LEDGE, -1, CT_BOLT_L, spec=f"M3×{CT_BOLT_L} 냄비머리 볼트 (세라믹 단자대)")
 
 ob = box(fx - 32, 124, BAY_Z0 + T05, fx + 32, 125, FLOOR_Z - 12).union(box(fx - 32, 125, BAY_Z0 + T05, fx + 32, 137, BAY_Z0 + T05 + 1))
 OB_HOLES = [(fx - 20, 131), (fx + 20, 131)]

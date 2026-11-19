@@ -26,12 +26,14 @@ PTC:   # PTC 100W 히터 (v3.3.0 확정: 스마트스토어 jojoruby "12V 100W �
   fin_l:      {value: 56,  status: 가정, source: "핀(발열부) 길이, 사진 비율로 추정. 양끝 받침대 = (w - fin_l)/2. 창판 개구 폭"}
   fin_h:      {value: 28,  status: 가정, source: "핀 높이 (h - 위아래 테두리 2+2 가정). 창판 개구 높이"}
 
-CTERM: # 세라믹 단자대 2P 10A 이상 (PTC 리드선 연장) → H12. 상품 미정
+CTERM: # 세라믹 단자대 TLB-700-2P-TS (PTC 리드선 연장) → H12 (v3.5.0 상품 확정)
   bom: 68
-  l:       {value: 30, status: 가정, source: "일반 세라믹 단자대 2P 크기, 구매 후 실측"}
-  w:       {value: 20, status: 가정, source: "구매 후 실측"}
-  h:       {value: 14, status: 가정, source: "구매 후 실측"}
-  hole_sp: {value: 22, status: 가정, source: "장착 구멍 2개 간격, 구매 후 실측"}
+  l:       {value: 21,   status: 판매처 표기, source: "TLB-700 데이터시트 Dimension (팀 제공 이미지 2026-11-18), 디바이스마트 39399"}
+  w:       {value: 18,   status: 판매처 표기, source: "TLB-700 데이터시트 Dimension (팀 제공 이미지 2026-11-18), 디바이스마트 39399"}
+  h:       {value: 15.6, status: 판매처 표기, source: "TLB-700 데이터시트 Dimension (팀 제공 이미지 2026-11-18), 디바이스마트 39399"}
+  hole_d:  {value: 4.5,  status: 판매처 표기, source: "가운데 장착 구멍 1개 관통 (Section B-B)"}
+  cbore_d: {value: 7.5,  status: 판매처 표기, source: "위에서 자리파기 Ø7.5 (Section B-B)"}
+  cbore_h: {value: 5,    status: 판매처 표기, source: "자리파기 깊이 5 → 나사 머리가 바닥에서 10.6 높이 턱에 앉음"}
 
 EXP:   # ESP32 확장보드 CMODULE-47 (디바이스마트 15315957) → 스탠드오프 4개 위치 (E01)
   bom: 21
@@ -40,13 +42,14 @@ EXP:   # ESP32 확장보드 CMODULE-47 (디바이스마트 15315957) → 스탠�
   t:     {value: 1.6,  status: 가정, source: "일반 PCB 두께"}
   inset: {value: 3.5,  status: 가정, source: "모서리 구멍 4개(사진), 위치 미표기 → 도착 후 실측"}
 
-LC:    # 1kg 바형 로드셀 → L01·L03 블록, 타공판 구멍, M4 볼트
+LC:    # 1kg 바형 로드셀 Voltly VLT-LCS002 → L01·L03 블록, 타공판 구멍, 볼트 (v3.5.0 판매처 도면)
   bom: 5
-  L:        {value: 80,   status: 가정, source: "Voltly VLT-LCS002 일반 규격 (구매완료 11/7, 실측 전)"}
-  s:        {value: 12.7, status: 가정, source: "단면 12.7각 일반 규격"}
-  hole_sp:  {value: 15,   status: 가정, source: "구멍 간격 가정"}
-  hole_end: {value: 7.5,  status: 가정, source: "끝에서 첫 구멍까지 가정"}
-  thread:   {value: 4,    status: 가정, source: "M4 가정 (M5일 수 있음)"}
+  L:           {value: 80,   status: 판매처 표기, source: "판매처 도면 VLT-LCS002 (팀 제공 이미지 2026-11-18)"}
+  s:           {value: 12.7, status: 판매처 표기, source: "판매처 도면 VLT-LCS002 (팀 제공 이미지 2026-11-18)"}
+  hole_sp:     {value: 15,   status: 판매처 표기, source: "판매처 도면 VLT-LCS002 (팀 제공 이미지 2026-11-18)"}
+  hole_end:    {value: 5,    status: 판매처 표기, source: "판매처 도면 VLT-LCS002: (80 − 15 − 40 − 15) / 2 (직접 표기 없음, 계산값)"}
+  thread_base: {value: 5,    status: 판매처 표기, source: "판매처 도면 VLT-LCS002 2-M5 (전선 나오는 쪽 = 고정 쪽)"}
+  thread_tray: {value: 4,    status: 판매처 표기, source: "판매처 도면 VLT-LCS002 2-M4 (트레이 쪽)"}
 
 LCD:   # LCD1602 + I2C 백팩 (키트 보유) → 앞판 창·구멍 (E10)
   bom: 키트
@@ -174,7 +177,7 @@ MAG:   # 문 자석 8×3 네오디뮴 → 앞판 P02·문 D01 자석 포켓 (D05
 
 LINER: # v3.2.0: 알루미늄 라이너 구멍 (업체 가공). 포맥스·폼 구멍은 그대로
   bolt_d:  {value: 4.0,  status: 가정, source: "팀 결정 11/14: M3 볼트·나사 구멍 Ø3.4 → Ø4.0 (포맥스·폼·라이너 겹침 오차 흡수)"}
-  cable_d: {value: 12.0, status: 가정, source: "케이블 구멍 + 실리콘 그로밋 Ø12 (판 0.5~1mm용, BOM 51)"}
+  cable_d: {value: 16.0, status: 가정, source: "팀 결정 11/19: 커넥터·다발 여유. 그로밋 상품 정하면 그 장착 구멍으로 (BOM 51)"}
 
 VENDOR_COLORS: # v3.4.0 알루미늄 업체 DXF 색 (ACI). 특정 업체 규칙이 아닌 "보기 쉽게". 업체가 규칙을 주면 여기만 바꿈
   outer: {value: 5, status: 가정, source: "외곽 (잘라 낼 바깥선) 파랑, 레이어 OUTER"}
