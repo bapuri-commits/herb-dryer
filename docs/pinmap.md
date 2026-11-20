@@ -7,7 +7,7 @@ BOM `핀맵(ESP32)` 시트와 같은 내용. 코드는 [`firmware/include/pins.h
 
 | 핀 | 연결 | 비고 |
 |---|---|---|
-| GPIO21 / 22 | I2C SDA / SCL | SHT31 0x44 · BME688 #1 0x77(전실) · BME688 #2 0x76(흡기, P2 헤더 SDO→GND) · LCD 0x27. 주소 변경 불가 시 TCA9548A. 50~100kHz, SDA·SCL을 GND와 꼬아 히터선과 다른 관통구로 |
+| GPIO21 / 22 | I2C SDA / SCL, 100kHz | 메인: SHT31 0x44 · DFR0576(TCA9548A) 0x70. 먹스 채널: ch0 BME688 #1 0x77(전실) · ch1 BME688 #2 0x77(흡기) · ch2 LCD 0x27. DFR0576 VCC = 3V3(5V 금지). LCD VCC는 5V(MP1584), LCD SDA·SCL·GND만 ch2 (v3.6.0). SDA·SCL을 GND와 꼬아 히터선과 다른 관통구로 |
 | GPIO16 / 17 | HX711 DT / SCK | 3.3V 동작 OK |
 | GPIO25 | 히터 PWM | DFR0457 #1 → PTC 100W (LEDC 1kHz, **최대 80%**, 켤 때 2~3초 소프트 스타트) |
 | GPIO26 | 순환팬 60mm PWM | 4핀 팬 PWM선 직결, 운전 중 60~100% |
@@ -21,5 +21,5 @@ BOM `핀맵(ESP32)` 시트와 같은 내용. 코드는 [`firmware/include/pins.h
 | GPIO18 / 19 / 23 / 5 | 마이크로SD SPI (SCK/MISO/MOSI/CS) | CSV 로그 (회차 번호 + 경과 시간, 날짜는 수기) |
 | GPIO12 | 비움 | 플래시 전압 선택 부팅핀 — 쓰지 않는다 |
 | 5V(VIN) | MP1584 5.0V 출력 | USB 동시 연결 시 USB 뽑고 공급 |
-| 3V3 | 센서 전원 (SHT31·BME688×2·HX711) | LCD만 5V (PCF8574 백팩 풀업이 5V면 SDA/SCL 확인) |
+| 3V3 | 센서 전원 (SHT31·BME688×2·HX711·DFR0576) | LCD만 5V (백팩 5V 풀업은 DFR0576 ch2가 메인 버스와 분리) |
 | — | 쓰지 않는 것 | 블루투스·Wi-Fi(v3.0에서 제거), RTC 없음. GPIO0(부팅), GPIO6~11(플래시), GPIO36/39 |
