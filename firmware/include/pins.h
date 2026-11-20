@@ -12,10 +12,16 @@
 #pragma once
 #include <stdint.h>
 
-// ---- I2C (50~100kHz): SHT31 0x44, BME688 #1 0x77(전실), BME688 #2 0x76(흡기, P2 헤더 SDO→GND, 안 되면 TCA9548A), LCD 0x27
+// ---- I2C 100kHz (v3.6.0): 메인 = SHT31 0x44 + DFR0576(TCA9548A) 0x70
+//      먹스 채널: ch0 BME688 #1 0x77(전실), ch1 BME688 #2 0x77(흡기), ch2 LCD 0x27
+//      DFR0576 VCC = 3V3 (5V 금지: VCC ≤ 4V여야 메인 쪽 Vpass ≤ 2.7V). LCD VCC는 5V, SDA·SCL·GND만 ch2
 constexpr int PIN_I2C_SDA = 21;  // I2C 데이터
 constexpr int PIN_I2C_SCL = 22;  // I2C 클럭
 constexpr uint32_t I2C_FREQ_HZ = 100000;  // 배선이 길고 히터선 근처라 100kHz 이하
+constexpr uint8_t I2C_MUX_ADDR = 0x70;   // DFR0576 다이얼 전부 0
+constexpr uint8_t MUX_CH_BME1 = 0;       // BME688 #1 (전실) 0x77
+constexpr uint8_t MUX_CH_BME2 = 1;       // BME688 #2 (흡기) 0x77
+constexpr uint8_t MUX_CH_LCD  = 2;       // LCD 0x27 (5V 풀업 → 먹스가 레벨 분리)
 
 // ---- HX711 로드셀 앰프 (3.3V 동작)
 constexpr int PIN_HX711_DT  = 16;  // HX711 데이터 출력
