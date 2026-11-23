@@ -348,7 +348,8 @@ def write_merged(items, out, vc, version):
         if kind == "bent":
             head += ["Flat patterns = sum of outside dims, apply bend deduction. All bends 90 deg.",
                      "A14 tray gap strip: first leg 9.5 (not 10) -> flat width 19.5, bend at 9.5 (tray gap 2mm).",
-                     "H06 heater duct body: visible face = OUTSIDE of U; fold side walls AWAY from viewer. Holed wall = right wall."]
+                     "All U/channel parts: visible face = OUTSIDE; fold walls/flanges AWAY from viewer (required for H06, recommended for others).",
+                     "H06 heater duct body: holed wall = right wall. H09/H11 plates 106.5 wide fit INSIDE H06 (107), H10 lid inside 109.5 covers H06 (109): fit gap 0.5."]
         for i, t in enumerate(head):
             ms.add_text(t, height=5, dxfattribs=A("note")).set_placement((0, 20 + (len(head) - 1 - i) * 8))
         fn = os.path.join(out, f"{tag}_Al1T_{kind}_all.dxf")
@@ -453,17 +454,20 @@ def heater_items(H):
                             "접는 방향: 도면에 보이는 면 = ㄷ자 바깥면, 양옆 벽은 도면 뒤쪽으로 접기 (구멍이 한쪽 끝에 치우쳐 좌우가 다른 부품). 구멍 있는 쪽 = 오른벽",
                             group="1T 절곡 (히터 덕트)"))
     items[-1]["dxf_note"] = "FOLD DIRECTION: visible face = OUTSIDE of U. fold both side walls AWAY from viewer (behind drawing). Holed wall = right wall"
-    top = bot + 2 * H.HT; f = H.FLG
+    top = (H.LX1 - H.LX0) + 2 * H.HT; f = H.FLG          # v3.7.0 뚜껑 안쪽 = 몸통 바깥 + 끼움 여유
     items.append(bent_multi("H10_heater_duct_lid_Al1T", "히터 덕트 뚜껑", mat, L, top + 2 * f,
                             [((0, f), (L, f)), ((0, f + top), (L, f + top))], [], [],
-                            f"top {top:g} x flange {f} x L{L:g}", f"위판 {top:g} + 날개 {f} ×2 (아래로 접기)", group="1T 절곡 (히터 덕트)"))
-    pw, ph = H.IX1 - H.IX0, H.IZ1 - H.IZ0
+                            f"top {top:g} x flange {f} x L{L:g}",
+                            f"위판 {top:g} (안쪽 {H.LX1 - H.LX0:g}) + 날개 {f} ×2 (아래로 접기). 끼움 여유 {H.HT_FIT:g} (H06 바깥 {bot:g}을 덮음)",
+                            group="1T 절곡 (히터 덕트)"))
+    pw, ph = H.PX1 - H.PX0, H.IZ1 - H.IZ0                 # v3.7.0 판 폭 = 몸통 안쪽 - 끼움 여유
     def plate(name, title, holes_xz, inner_xz, finished, note):
-        hs = [(f + (x - H.IX0), z - H.IZ0, d) for x, z, d in holes_xz]
+        note += f". 끼움 여유 {H.HT_FIT:g} (H06 안쪽 {H.IX1 - H.IX0:g}에)"
+        hs = [(f + (x - H.PX0), z - H.IZ0, d) for x, z, d in holes_xz]
         inn = []
         for g in inner_xz:
-            if g[0] == "circle": inn.append(("circle", (f + g[1][0] - H.IX0, g[1][1] - H.IZ0), g[2], None))
-            else: inn.append(("poly", [(f + x - H.IX0, z - H.IZ0) for x, z in g[1]], None))
+            if g[0] == "circle": inn.append(("circle", (f + g[1][0] - H.PX0, g[1][1] - H.IZ0), g[2], None))
+            else: inn.append(("poly", [(f + x - H.PX0, z - H.IZ0) for x, z in g[1]], None))
         return bent_multi(name, title, "알루미늄 1T", pw + 2 * f, ph, [((f, 0), (f, ph)), ((f + pw, 0), (f + pw, ph))], hs, inn,
                           finished, note, group="1T 절곡 (히터 덕트)")
     x0, z0, x1, z1 = H.WIN

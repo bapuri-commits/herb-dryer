@@ -163,7 +163,7 @@ def main():
 
 
 def print_parts(m):
-    return [p for p in m.PARTS if p["phase"] == 1 and p["proc"] == "3D프린트"]
+    return [p for p in m.PARTS if p["phase"] == 1 and p["proc"] == "3D프린트"] + list(getattr(m, "PRINT_ONLY", []))
 
 
 if __name__ == "__main__":
