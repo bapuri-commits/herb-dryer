@@ -275,8 +275,7 @@ add("P03_back_foamex5T", back, C_FOAMEX, "포맥스 5T", "재단")
 
 # 바닥판: 289 × 289
 bottom = box(WALL + 0.5, WALL + 0.5, 0, OUT - WALL - 0.5, OUT - WALL - 0.5, WALL)
-DRAIN = (CH_CX, 275)
-bottom = bottom.cut(cyl("z", DRAIN, 4, -1, WALL + 1))
+# v3.6.0: 배수 구멍 Ø8 삭제 (v2.x 펠티어 응축수용 잔재, 바닥 누설 경로)
 
 # 천장판: 300 × 300
 top = box(0, 0, WALL_H, OUT, OUT, OZ)
@@ -290,7 +289,7 @@ top_saved = top
 # ============================================================
 # 3. 단열 폼 10T + 링 영역 블록
 # ============================================================
-foam_bot = box(IN0, IN0, WALL, IN1, IN1, IN0).cut(cyl("z", DRAIN, 4, 0, 20))
+foam_bot = box(IN0, IN0, WALL, IN1, IN1, IN0)
 foam_top = box(IN0, IN0, LID_Z, IN1, IN1, LID_Z + INS)
 foam_top = foam_top.cut(box(EXH[0], EXH[1], LID_Z - 1, EXH[2], EXH[3], LID_Z + INS + 1))
 
@@ -351,7 +350,7 @@ def dname(prefix, shape):
     a, b = sorted((bb.xlen, bb.ylen, bb.zlen))[1:][::-1]
     return f"{prefix}_{round(a * 2) / 2:g}x{round(b * 2) / 2:g}"
 liners = {}
-liners["A01_liner_bay_bottom_Al1T"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05).cut(cyl("z", DRAIN, 4, 0, 20))
+liners["A01_liner_bay_bottom_Al1T"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05)
 liners["A02_liner_bay_L_Al1T"] = box(IN0, IN0, IN0 + T05, IN0 + T05, IN1, FLOOR_Z)
 liners["A02_liner_bay_R_Al1T"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P_LINER, LC_R, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, LC_R, IN1 - 2, IN1 + 1))
 liners["A03_liner_bay_front_Al1T"] = box(IN0 + T05, IN0, IN0 + T05, IN1 - T05, IN0 + T05, FLOOR_Z)   # v3.0 복구
@@ -987,6 +986,24 @@ def wago_holder(name, y0, z0, n, so_L):
 wago_holder("E05_power", 200, 22, 4, 10)
 wago_holder("E05_i2c", 30, 178, 4, 10)
 
+# v3.6.0: I2C 멀티플렉서 DFR0576 (TCA9548A 0x70) — E05_i2c 옆. Gravity 입력 = −y (E05_i2c 쪽), 장착 구멍 = +y 변 2개 [가정]
+TCA = PARAMS["TCA"]
+TCA_Y0, TCA_Z0 = 100, 178
+tca_x0 = BP_X1 + 10
+tca_holes = [(TCA_Y0 + TCA["w"] - TCA["hole_edge_x"], TCA_Z0 + TCA["d"] - TCA["hole_top"]),
+             (TCA_Y0 + TCA["w"] - TCA["hole_edge_x"], TCA_Z0 + TCA["hole_bot"])]
+tca = box(tca_x0, TCA_Y0, TCA_Z0, tca_x0 + TCA["t"], TCA_Y0 + TCA["w"], TCA_Z0 + TCA["d"])
+tca = tca.union(box(tca_x0 + TCA["t"], TCA_Y0 + 1, TCA_Z0 + 2, tca_x0 + TCA["h_parts"], TCA_Y0 + TCA["w"] - 8, TCA_Z0 + TCA["d"] - 2))   # 헤더·IC·커넥터 (구멍 쪽 8 비움)
+for p in tca_holes:
+    tca = tca.cut(cyl("x", p, TCA["hole_d"] / 2, tca_x0 - 1, tca_x0 + TCA["t"] + 1))
+add("E13_I2C_mux_DFR0576", tca, C_PCB, kind="buy",
+    note="TCA9548A 0x70, VCC 3.3V 전용. ch0 BME688#1, ch1 BME688#2, ch2 LCD(SDA·SCL·GND만). 장착 구멍 위치 [가정] → 받은 뒤 K06에 대고 뚫기")
+for j, p in enumerate(tca_holes):
+    so_bp(f"E13_so_{j}", p[0], p[1], 10)
+    bolt(f"E13_bolt_{j}", "x", p, tca_x0 + TCA["t"], -1, 6, spec="M3×6 냄비머리 볼트 (보드→스탠드오프)")
+TCA_DUPONT_GAP = (SB_X1 - WALL) - (tca_x0 + TCA["h_parts"])       # 헤더 위 듀폰 공간
+assert TCA_DUPONT_GAP >= 15, TCA_DUPONT_GAP
+
 # 가운데: ESP32 확장보드 + DevKitC
 EXP_Y0, EXP_Z0 = 30, 66
 exp_holes = [(EXP_Y0 + EXP["inset"], EXP_Z0 + EXP["inset"]), (EXP_Y0 + EXP["w"] - EXP["inset"], EXP_Z0 + EXP["inset"]),
@@ -1030,7 +1047,7 @@ for (y, z) in BP_HOLES:
     bp = bp.cut(cyl("x", (y, z), 1.7, BP_X0 - 1, BP_X1 + 1))
     bp = bp.cut(cq.Workplane("YZ").circle(3.0).workplane(offset=1.7).circle(1.7).loft().translate((BP_X0 - 0.01, y, z)))   # 접시 자리(뒷면)
 add("K06_sidebox_mount_plate_foamex5T", bp, C_FOAMEX, "포맥스 5T", "재단",
-    note="본체 오른쪽 옆판 바깥면에 PVC본드. 스탠드오프는 접착 전에 뒤에서 접시머리로 고정")
+    note="본체 오른쪽 옆판 바깥면에 PVC본드. 스탠드오프는 접착 전에 뒤에서 접시머리로 고정. E13(DFR0576) 구멍 2개는 DFR0576 받은 뒤 대고 뚫기")
 
 # 앞면: LCD + 버튼
 lcd_y0 = WALL + 3
@@ -1040,7 +1057,7 @@ for p in K_LCD_HOLES:
 lcd = lcd.union(box(K_LCD_C[0] - LCD["bez_w"] / 2, lcd_y0 - LCD["bez_t"] + 0.6, K_LCD_C[1] - LCD["bez_h"] / 2,
                     K_LCD_C[0] + LCD["bez_w"] / 2, lcd_y0, K_LCD_C[1] + LCD["bez_h"] / 2))
 lcd = lcd.union(box(K_LCD_C[0] - 21, lcd_y0 + 1.6, K_LCD_C[1] - 10, K_LCD_C[0] + 21, lcd_y0 + 13, K_LCD_C[1] + 10))
-add("E10_LCD1602_I2C", lcd, (0.1, 0.4, 0.2), kind="buy", note="측면 박스 앞면. 백팩 5V 풀업 확인 (S2)")
+add("E10_LCD1602_I2C", lcd, (0.1, 0.4, 0.2), kind="buy", note="측면 박스 앞면. 백팩 5V 풀업 → DFR0576 ch2로 분리 (v3.6.0), VCC 5V")
 for i, p in enumerate(K_LCD_HOLES):
     add(f"E10_spacer_{i}", cyl("y", p, 3, WALL, lcd_y0).cut(cyl("y", p, 1.6, WALL - 1, lcd_y0 + 1)), (0.9, 0.9, 0.9), kind="fastener")
     count("M3 나일론 스페이서 3mm")
@@ -1077,7 +1094,8 @@ add("E09_rocker_switch_KCD1", box(K_SW[0] - 9.5, OUT - 22, K_SW[1] - 6.4, K_SW[0
 for (x, y_, L) in SO_HOLES:
     bottom = bottom.cut(cyl("z", (x, y_), 1.7, -1, WALL + 1))
     bottom = bottom.cut(cq.Workplane("XY").circle(3.0).workplane(offset=1.7).circle(1.7).loft().translate((x, y_, -0.01)))
-add("P06_bottom_plate_foamex5T", bottom, C_FOAMEX, "포맥스 5T", "재단")
+add("P06_bottom_plate_foamex5T", bottom, C_FOAMEX, "포맥스 5T", "재단",
+    note="v3.6.0에서 배수 구멍 삭제. 이미 받은 판은 아랫면에서 중성 실리콘으로 막음")
 def recut(name, tool):
     for p in PARTS:
         if p["name"] == name:

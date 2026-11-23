@@ -8,7 +8,7 @@ foamex/ (포맥스)
   발주표.xlsx, 확인도면.pdf (판마다 1쪽, 구멍 ID·좌표표)
   레이어: CUT_OUTER 외곽 / CUT_INNER 안쪽 개구 / DRILL 구멍(Ø8 이하) / NOTE 글자
 
-aluminum/ (알루미늄 1T 전부: 라이너·평판·띠·A12·E07·L자 9종·히터 덕트 4종)
+aluminum/ (알루미늄 1T: 라이너·평판·띠·A12·E07·히터 덕트 4종. L자 9종은 params VENDOR.l_angles가 true일 때만)
   dxf/<부품>.dxf     AutoCAD 2000, 색은 params VENDOR_COLORS (기본: 외곽 파랑 5, 구멍 초록 3,
                      절곡선 빨강 1 점선, 소재크기 자홍 6 = 외곽 + 사방 5, 글자 회색 8), 왼쪽 위 범례
                      레이어 OUTER / HOLE / BEND / STOCK / NOTE (영문: R2000 한글 깨짐 방지)
@@ -80,8 +80,7 @@ ALUMINUM = dict(
         "업체에 올릴 파일 = 발주표 '올릴 파일' 열: 평판 = dxf/ + step/, 절곡 부품 = step/ + 2D도면.pdf (같은 쪽 번호)",
         "DXF_COLORS",   # run_aluminum에서 params VENDOR_COLORS로 채움
         "절곡 부품: 펼친 그림은 바깥 치수 합(굽힘 공제 전) — 전개는 업체 기준으로. 모두 90°. 접은 뒤 바깥 치수는 2D도면",
-        "앵글 대신 1T L자 10×10 절곡 13개: 비싸면 이 묶음만 빼 주세요 (앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
-        "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요",
+        "L_ANGLES",     # run_aluminum에서 params VENDOR.l_angles로 채움
         "H09 PTC 창판은 개구만 (장착 구멍은 저희가 PTC에 대고 뚫음)",
     ],
     footer="여분: A04_L 라이너 1장. T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음)",
@@ -435,9 +434,20 @@ def run_aluminum(cad_module, outdir, version=""):
     H = cad_module
     vc = {k: int(v) for k, v in H.PARAMS["VENDOR_COLORS"].items() if k != "bom"}
     pk = dict(ALUMINUM)
-    pk["notes"] = [("DXF (AutoCAD 2000, mm, 1:1) 색·레이어: " + ", ".join(
-        f"{ACI_KO.get(vc[k], vc[k])}{' 점선' if k == 'bend' else ''} {AL_LAYER_NAMES[k]} = {AL_LEGEND_KO[k]}" for k in AL_LAYER_NAMES)
-        + ". 업체 색 규칙이 따로 있으면 알려 주세요 (바꿔 드림)") if n == "DXF_COLORS" else n for n in ALUMINUM["notes"]]
+    with_l = bool(H.PARAMS["VENDOR"]["l_angles"])
+    l_notes = (["앵글 대신 1T L자 10×10 절곡 13개: 비싸면 이 묶음만 빼 주세요 (앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
+                "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요"] if with_l else
+               ["L자(앵글 대용)는 저희가 직접 가공 — 이 묶음에 없음"])
+    pk["notes"] = []
+    for n in ALUMINUM["notes"]:
+        if n == "DXF_COLORS":
+            pk["notes"].append("DXF (AutoCAD 2000, mm, 1:1) 색·레이어: " + ", ".join(
+                f"{ACI_KO.get(vc[k], vc[k])}{' 점선' if k == 'bend' else ''} {AL_LAYER_NAMES[k]} = {AL_LEGEND_KO[k]}" for k in AL_LAYER_NAMES)
+                + ". 업체 색 규칙이 따로 있으면 알려 주세요 (바꿔 드림)")
+        elif n == "L_ANGLES":
+            pk["notes"] += l_notes
+        else:
+            pk["notes"].append(n)
     tx, ty = H.TRAY_X, H.TRAY_Y
     pk["extra"] = [
         dict(name=f"T03_tray_cross_strip_X_Al1T_10x{tx - 2:g}", title="트레이 십자 띠 (가로)", W=float(tx - 2), H=10.0, qty=1,
@@ -471,7 +481,7 @@ def run_aluminum(cad_module, outdir, version=""):
          "벽 다리 구멍 = 아래 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
         ("A18_partition_angle", "칸막이 받침", "A18_partition_angle_1", 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
     ]
-    for nm, title, src, q, holes, note in ang:
+    for nm, title, src, q, holes, note in (ang if with_l else []):   # VENDOR.l_angles false면 L자는 직접 가공 (묶음에서 뺌)
         L = part_len(H, src) if isinstance(src, str) else src
         hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
         it = bent_item(f"{nm}_Al1T_L10x10_{L:g}", title, L, 20.0, 10.0, hs, f"L 10x10 (outside) x {L:g}", q,

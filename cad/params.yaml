@@ -179,6 +179,20 @@ LINER: # v3.2.0: 알루미늄 라이너 구멍 (업체 가공). 포맥스·폼 �
   bolt_d:  {value: 4.0,  status: 가정, source: "팀 결정 11/14: M3 볼트·나사 구멍 Ø3.4 → Ø4.0 (포맥스·폼·라이너 겹침 오차 흡수)"}
   cable_d: {value: 16.0, status: 가정, source: "팀 결정 11/19: 커넥터·다발 여유. 그로밋 상품 정하면 그 장착 구멍으로 (BOM 51)"}
 
+TCA:   # I2C 멀티플렉서 DFRobot Gravity DFR0576 (TCA9548A) → E13 (v3.6.0). 장착 구멍 2개는 오른쪽(+y) 변
+  bom: 54
+  w:        {value: 32,  status: 판매처 표기, source: "DFRobot wiki DFR0576 \"32 * 32mm\""}
+  d:        {value: 32,  status: 판매처 표기, source: "DFRobot wiki DFR0576"}
+  t:        {value: 1.6, status: 판매처 표기, source: "DFR0576 Layout V1.0 PDF \"Thickness: 1.6mm\""}
+  h_parts:  {value: 11,  status: 가정, source: "부품 높이(헤더 포함) 약 11. 도착 후 실측"}
+  hole_edge_x: {value: 3.6, status: 가정, source: "DFR0576 Layout V1.0 PDF를 축척으로 잰 값 (오른쪽 변에서 안쪽), 도착 후 실측"}
+  hole_top:    {value: 2.6, status: 가정, source: "DFR0576 Layout V1.0 PDF 축척값 (위 변에서), 도착 후 실측"}
+  hole_bot:    {value: 3.8, status: 가정, source: "DFR0576 Layout V1.0 PDF 축척값 (아래 변에서, 세로 간격 약 25.7), 도착 후 실측"}
+  hole_d:      {value: 3.1, status: 가정, source: "DFR0576 Layout V1.0 PDF 축척값, 도착 후 실측"}
+
+VENDOR: # 알루미늄 업체 묶음 구성 (v3.6.0)
+  l_angles: {value: true, status: 가정, source: "팀 결정 11/23: L자(앵글 대용) 9종 16조각도 업체 1T 절곡 (같은 날 \"직접\"을 되돌림). 직접 가공으로 바꾸면 false"}
+
 VENDOR_COLORS: # v3.4.0 알루미늄 업체 DXF 색 (ACI). 특정 업체 규칙이 아닌 "보기 쉽게". 업체가 규칙을 주면 여기만 바꿈
   outer: {value: 5, status: 가정, source: "외곽 (잘라 낼 바깥선) 파랑, 레이어 OUTER"}
   hole:  {value: 3, status: 가정, source: "구멍·안쪽 개구 (관통) 초록, 레이어 HOLE"}
