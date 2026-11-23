@@ -191,7 +191,7 @@ TCA:   # I2C 멀티플렉서 DFRobot Gravity DFR0576 (TCA9548A) → E13 (v3.6.0)
   hole_d:      {value: 3.1, status: 가정, source: "DFR0576 Layout V1.0 PDF 축척값, 도착 후 실측"}
 
 VENDOR: # 알루미늄 업체 묶음 구성 (v3.6.0)
-  l_angles: {value: false, status: 가정, source: "팀 결정 11/23: L자(앵글 대용) 9종 16조각은 앵글 10×10×1 사서 직접. 업체로 다시 돌리면 true"}
+  l_angles: {value: true, status: 가정, source: "팀 결정 11/23: L자(앵글 대용) 9종 16조각도 업체 1T 절곡 (같은 날 \"직접\"을 되돌림). 직접 가공으로 바꾸면 false"}
 
 VENDOR_COLORS: # v3.4.0 알루미늄 업체 DXF 색 (ACI). 특정 업체 규칙이 아닌 "보기 쉽게". 업체가 규칙을 주면 여기만 바꿈
   outer: {value: 5, status: 가정, source: "외곽 (잘라 낼 바깥선) 파랑, 레이어 OUTER"}

@@ -481,7 +481,7 @@ def run_aluminum(cad_module, outdir, version=""):
          "벽 다리 구멍 = 아래 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
         ("A18_partition_angle", "칸막이 받침", "A18_partition_angle_1", 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
     ]
-    for nm, title, src, q, holes, note in (ang if with_l else []):   # v3.6.0: 기본 = 직접 가공 (VENDOR.l_angles false)
+    for nm, title, src, q, holes, note in (ang if with_l else []):   # VENDOR.l_angles false면 L자는 직접 가공 (묶음에서 뺌)
         L = part_len(H, src) if isinstance(src, str) else src
         hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
         it = bent_item(f"{nm}_Al1T_L10x10_{L:g}", title, L, 20.0, 10.0, hs, f"L 10x10 (outside) x {L:g}", q,
