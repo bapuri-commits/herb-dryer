@@ -275,8 +275,7 @@ add("P03_back_foamex5T", back, C_FOAMEX, "포맥스 5T", "재단")
 
 # 바닥판: 289 × 289
 bottom = box(WALL + 0.5, WALL + 0.5, 0, OUT - WALL - 0.5, OUT - WALL - 0.5, WALL)
-DRAIN = (CH_CX, 275)
-bottom = bottom.cut(cyl("z", DRAIN, 4, -1, WALL + 1))
+# v3.6.0: 배수 구멍 Ø8 삭제 (v2.x 펠티어 응축수용 잔재, 바닥 누설 경로)
 
 # 천장판: 300 × 300
 top = box(0, 0, WALL_H, OUT, OUT, OZ)
@@ -290,7 +289,7 @@ top_saved = top
 # ============================================================
 # 3. 단열 폼 10T + 링 영역 블록
 # ============================================================
-foam_bot = box(IN0, IN0, WALL, IN1, IN1, IN0).cut(cyl("z", DRAIN, 4, 0, 20))
+foam_bot = box(IN0, IN0, WALL, IN1, IN1, IN0)
 foam_top = box(IN0, IN0, LID_Z, IN1, IN1, LID_Z + INS)
 foam_top = foam_top.cut(box(EXH[0], EXH[1], LID_Z - 1, EXH[2], EXH[3], LID_Z + INS + 1))
 
@@ -351,7 +350,7 @@ def dname(prefix, shape):
     a, b = sorted((bb.xlen, bb.ylen, bb.zlen))[1:][::-1]
     return f"{prefix}_{round(a * 2) / 2:g}x{round(b * 2) / 2:g}"
 liners = {}
-liners["A01_liner_bay_bottom_Al1T"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05).cut(cyl("z", DRAIN, 4, 0, 20))
+liners["A01_liner_bay_bottom_Al1T"] = box(IN0, IN0, IN0, IN1, IN1, IN0 + T05)
 liners["A02_liner_bay_L_Al1T"] = box(IN0, IN0, IN0 + T05, IN0 + T05, IN1, FLOOR_Z)
 liners["A02_liner_bay_R_Al1T"] = box(IN1 - T05, IN0, IN0 + T05, IN1, IN1, FLOOR_Z).cut(cyl("x", PT1P_LINER, LC_R, IN1 - 2, IN1 + 1)).cut(cyl("x", PT1S, LC_R, IN1 - 2, IN1 + 1))
 liners["A03_liner_bay_front_Al1T"] = box(IN0 + T05, IN0, IN0 + T05, IN1 - T05, IN0 + T05, FLOOR_Z)   # v3.0 복구
@@ -1095,7 +1094,8 @@ add("E09_rocker_switch_KCD1", box(K_SW[0] - 9.5, OUT - 22, K_SW[1] - 6.4, K_SW[0
 for (x, y_, L) in SO_HOLES:
     bottom = bottom.cut(cyl("z", (x, y_), 1.7, -1, WALL + 1))
     bottom = bottom.cut(cq.Workplane("XY").circle(3.0).workplane(offset=1.7).circle(1.7).loft().translate((x, y_, -0.01)))
-add("P06_bottom_plate_foamex5T", bottom, C_FOAMEX, "포맥스 5T", "재단")
+add("P06_bottom_plate_foamex5T", bottom, C_FOAMEX, "포맥스 5T", "재단",
+    note="v3.6.0에서 배수 구멍 삭제. 이미 받은 판은 아랫면에서 중성 실리콘으로 막음")
 def recut(name, tool):
     for p in PARTS:
         if p["name"] == name:
