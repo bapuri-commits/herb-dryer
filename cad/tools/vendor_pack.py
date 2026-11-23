@@ -78,6 +78,7 @@ ALUMINUM = dict(
         "재료: 알루미늄 1T 전부 (재질은 업체 기본). 재료 포함 견적",
         "치수는 완성 치수. 공차 ±0.3mm, 모서리 버(burr) 제거, 판마다 부품 이름 표시",
         "업체에 올릴 파일 = 발주표 '올릴 파일' 열: 평판 = dxf/ + step/, 절곡 부품 = step/ + 2D도면.pdf (같은 쪽 번호)",
+        "업체에 따라 합친 파일 2개(*_Al1T_flat_all.dxf = 평판 전부 / *_Al1T_bent_all.dxf = 절곡 펼친 그림 전부, 그려진 개수 = 수량) 또는 부품별 dxf/ 를 사용",
         "DXF_COLORS",   # run_aluminum에서 params VENDOR_COLORS로 채움
         "절곡 부품: 펼친 그림은 바깥 치수 합(굽힘 공제 전) — 전개는 업체 기준으로. 모두 90°. 접은 뒤 바깥 치수는 2D도면",
         "L_ANGLES",     # run_aluminum에서 params VENDOR.l_angles로 채움
@@ -265,6 +266,7 @@ def write_al_dxf(it, fn, vc, version):
     h = 2.5
     lines = [f"{it['name']}  AL {thick_of(it):g}T  {it['W']:g}x{it['H']:g}  qty {it['qty']}  {version}"]
     if it.get("bend"): lines.append(f"FOLDED (outside): {it['finished']}  — flat = sum of outside dims, apply bend deduction")
+    if it.get("dxf_note"): lines.append(it["dxf_note"])
     lines += [f"{ACI_NAME.get(vc[k], vc[k])}: {AL_LEGEND[k]}" for k in ("outer", "hole", "bend", "stock")]
     for i, t in enumerate(lines):
         ms.add_text(t, height=h, dxfattribs=A("note")).set_placement((x0, y1 + 4 + (len(lines) - 1 - i) * h * 1.6))
@@ -308,6 +310,63 @@ def check_al(items, out, vc):
     print(f"알루미늄 규칙 검사 통과: {len(items)}종 (평판 {len(items) - nb}, 절곡 {nb}), 색 {sorted(allowed)}, 구멍 ≥ 두께, 간격 ≥ 두께")
 
 
+MERGE_GAP, MERGE_ROW_W, MERGE_TXT = 15.0, 1000.0, 4.0
+
+
+def write_merged(items, out, vc, version):
+    """v3.6.2 업체 요청: 평판 전부 / 절곡 전부를 DXF 하나씩. 부품별 DXF의 OUTER·HOLE·BEND만, 수량만큼, 이름표(NOTE) 아래.
+    검사: 그린 개수 = 수량 합, 부품(이름표 포함) 겹침 0, 엔티티 수 = 부품별 DXF × 수량"""
+    keep = {AL_LAYER_NAMES[k]: k for k in ("outer", "hole", "bend")}
+    tag = f"herb-dryer_{version or 'dev'}"
+    for kind, sel in (("flat", lambda it: not it.get("bend")), ("bent", lambda it: bool(it.get("bend")))):
+        its = sorted([it for it in items if sel(it)], key=lambda it: (-it["H"], -it["W"], it["name"]))
+        doc = ezdxf.new("R2000", setup=True); doc.units = ezdxf.units.MM
+        for k, ln in AL_LAYER_NAMES.items():
+            if k != "stock": doc.layers.add(ln, color=vc[k], linetype="DASHED" if k == "bend" else "Continuous")
+        ms = doc.modelspace()
+        A = lambda k: {"layer": AL_LAYER_NAMES[k], "color": vc[k]}
+        x = y = 0.0; row_h = 0.0; boxes = []; n_ent = 0; want_ent = 0
+        for it in its:
+            src = [e for e in ezdxf.readfile(os.path.join(out, "dxf", f"{it['name']}.dxf")).modelspace() if e.dxf.layer in keep]
+            for i in range(it["qty"]):
+                label = f"{it['name']} ({i + 1}/{it['qty']})"
+                cw = max(it["W"], len(label) * MERGE_TXT * 0.75)
+                if x > 0 and x + cw > MERGE_ROW_W:
+                    y -= row_h + MERGE_GAP; x = 0.0; row_h = 0.0
+                hh = it["H"] + MERGE_TXT * 2.5            # 이름표 자리 (부품 아래)
+                oy = y - it["H"]                          # 부품 아래 변
+                for e in src:
+                    c = e.copy(); c.translate(x, oy, 0); ms.add_entity(c)
+                    k = keep[e.dxf.layer]; c.dxf.color = vc[k]; n_ent += 1
+                want_ent += len(src)
+                ms.add_text(label, height=MERGE_TXT, dxfattribs=A("note")).set_placement((x, oy - MERGE_TXT * 2))
+                boxes.append((x, oy - MERGE_TXT * 2.5, x + cw, y, label))
+                x += cw + MERGE_GAP; row_h = max(row_h, hh)
+        total = sum(it["qty"] for it in its)
+        head = [f"{tag}  aluminum 1T  {kind.upper()} parts: {len(its)} kinds, {total} pcs. Drawn count = quantity (each copy labeled n/qty). mm 1:1",
+                ", ".join(f"{ACI_NAME.get(vc[k], vc[k])}: {AL_LEGEND[k]}" for k in ("outer", "hole", "bend"))]
+        if kind == "bent":
+            head += ["Flat patterns = sum of outside dims, apply bend deduction. All bends 90 deg.",
+                     "A14 tray gap strip: first leg 9.5 (not 10) -> flat width 19.5, bend at 9.5 (tray gap 2mm).",
+                     "H06 heater duct body: visible face = OUTSIDE of U; fold side walls AWAY from viewer. Holed wall = right wall."]
+        for i, t in enumerate(head):
+            ms.add_text(t, height=5, dxfattribs=A("note")).set_placement((0, 20 + (len(head) - 1 - i) * 8))
+        fn = os.path.join(out, f"{tag}_Al1T_{kind}_all.dxf")
+        doc.saveas(fn)
+        # 검사
+        bad = []
+        if len(boxes) != total: bad.append(f"그린 개수 {len(boxes)} ≠ 수량 {total}")
+        if n_ent != want_ent: bad.append(f"엔티티 {n_ent} ≠ {want_ent}")
+        for i, a in enumerate(boxes):
+            for b in boxes[i + 1:]:
+                if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]: bad.append(f"겹침 {a[4]} / {b[4]}")
+        rd = ezdxf.readfile(fn)
+        n_back = sum(1 for e in rd.modelspace() if e.dxf.layer in keep)
+        if n_back != want_ent: bad.append(f"다시 읽은 엔티티 {n_back} ≠ {want_ent}")
+        if bad: raise SystemExit(f"합친 DXF({kind}) 검사 실패:\n  " + "\n  ".join(bad))
+        print(f"합친 DXF {os.path.basename(fn)}: {len(its)}종 {total}개, 엔티티 {n_ent}, 겹침 0")
+
+
 def upload_file(it):
     return f"step/{it['name']}.step + 2D도면.pdf" if it.get("bend") else f"dxf/{it['name']}.dxf + step/{it['name']}.step"
 
@@ -332,13 +391,14 @@ def l_angle_step(it, fn):
     구멍 위치: 접는 선까지 거리 = 바깥 모서리에서 거리"""
     import cadquery as cq
     L = it["W"]
-    s = cq.Workplane("XY").box(L, 10, 1, centered=False).union(cq.Workplane("XY").box(L, 1, 10, centered=False))
+    f = it["bend"][0][0][1]          # 바닥 다리 (v3.6.2: A14는 9.5)
+    s = cq.Workplane("XY").box(L, f, 1, centered=False).union(cq.Workplane("XY").box(L, 1, it["H"] - f, centered=False))
     for g in it["drill"]:
         (x, y), r = g[1], g[2]
-        if y <= 10:   # 바닥 다리 (Z 방향 구멍), 모서리(y=0)에서 10 - y
-            s = s.cut(cq.Workplane("XY").circle(r).extrude(1).translate((x, 10 - y, 0)))
-        else:         # 세운 다리 (Y 방향 구멍), 모서리(z=0)에서 y - 10
-            s = s.cut(cq.Workplane("XZ").circle(r).extrude(-1).translate((x, 0, y - 10)))
+        if y <= f:    # 바닥 다리 (Z 방향 구멍), 모서리(y=0)에서 f - y
+            s = s.cut(cq.Workplane("XY").circle(r).extrude(1).translate((x, f - y, 0)))
+        else:         # 세운 다리 (Y 방향 구멍), 모서리(z=0)에서 y - f
+            s = s.cut(cq.Workplane("XZ").circle(r).extrude(-1).translate((x, 0, y - f)))
     cq.exporters.export(s, fn)
     return s
 
@@ -389,8 +449,10 @@ def heater_items(H):
     Ht = 2 * side + bot
     items.append(bent_multi("H06_heater_duct_Al1T", "히터 덕트 몸통 ㄷ자", mat, L, Ht,
                             [((0, side), (L, side)), ((0, side + bot), (L, side + bot))], hs, [],
-                            f"U {bot:g} x {side:g} x L{L:g}", f"바닥 {bot:g} + 양옆 {side:g}, 길이 {L:g}. 오른벽 = 서모스탯 캡 Ø{H.KSD['cap_d'] + 1:g} + Ø3.4 ×2",
+                            f"U {bot:g} x {side:g} x L{L:g}", f"바닥 {bot:g} + 양옆 {side:g}, 길이 {L:g}. 오른벽 = 서모스탯 캡 Ø{H.KSD['cap_d'] + 1:g} + Ø3.4 ×2. "
+                            "접는 방향: 도면에 보이는 면 = ㄷ자 바깥면, 양옆 벽은 도면 뒤쪽으로 접기 (구멍이 한쪽 끝에 치우쳐 좌우가 다른 부품). 구멍 있는 쪽 = 오른벽",
                             group="1T 절곡 (히터 덕트)"))
+    items[-1]["dxf_note"] = "FOLD DIRECTION: visible face = OUTSIDE of U. fold both side walls AWAY from viewer (behind drawing). Holed wall = right wall"
     top = bot + 2 * H.HT; f = H.FLG
     items.append(bent_multi("H10_heater_duct_lid_Al1T", "히터 덕트 뚜껑", mat, L, top + 2 * f,
                             [((0, f), (L, f)), ((0, f + top), (L, f + top))], [], [],
@@ -483,11 +545,15 @@ def run_aluminum(cad_module, outdir, version=""):
     ]
     l_count = f"{len(ang)}종 {sum(a[3] for a in ang)}개"
     pk["notes"] = [n.replace("{L_COUNT}", l_count) for n in pk["notes"]]
+    # v3.6.2: 바닥(첫) 다리가 10이 아닌 것 — CAD 값으로 계산. A14 = 라이너 안쪽 ~ 트레이 - 2 (트레이 틈 2mm)
+    floors = {"A14_tray_gap_strip": round((H.tx0 - 2) - (H.IN0 + H.T05), 2)}
     for nm, title, src, q, holes, note in (ang if with_l else []):   # VENDOR.l_angles false면 L자는 직접 가공 (묶음에서 뺌)
         L = part_len(H, src) if isinstance(src, str) else src
-        hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
-        it = bent_item(f"{nm}_Al1T_L10x10_{L:g}", title, L, 20.0, 10.0, hs, f"L 10x10 (outside) x {L:g}", q,
-                       f"앵글 10×10×1 대신 1T 절곡. {note}. 구멍 다리: 아래 반쪽(0~10) = 바닥/첫 다리, 위 반쪽(10~20) = 벽 다리")
+        f = floors.get(nm, 10.0)
+        hs = [(x, f + 5.0 if leg == "wall" else f / 2, 3.4) for x, leg in holes]
+        extra = f" 바닥 다리 {f:g} (트레이 틈 2mm)." if f != 10.0 else ""
+        it = bent_item(f"{nm}_Al1T_L{f:g}x10_{L:g}", title, L, f + 10.0, f, hs, f"L {f:g}x10 (outside) x {L:g}", q,
+                       f"앵글 10×10×1 대신 1T 절곡.{extra} {note}. 구멍 다리: 아래(0~{f:g}) = 바닥/첫 다리, 위({f:g}~{f + 10:g}) = 벽 다리")
         it["group"] = "1T 절곡 (앵글 대신)"
         items.append(it)
     items += heater_items(H)
@@ -515,6 +581,7 @@ def run_aluminum(cad_module, outdir, version=""):
     for it in items:
         print(f"{it['group']:16s} {it['name']:42s} {it['W']:g}x{it['H']:g} x{it['qty']}  {proc_of(it)}  inner {len(it['inner'])}  drill {drill_summary(it['drill'])}")
     check_al(items, out, vc)
+    write_merged(items, out, vc, version)
     a10 = next(it for it in items if it["name"].startswith("A10"))
     print("A10 구멍:", drill_summary(a10["drill"]))
     return items
