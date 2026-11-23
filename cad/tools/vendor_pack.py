@@ -72,7 +72,7 @@ ALUMINUM = dict(
         (("A01", "A02", "A03", "A04", "A06", "A07", "D03"), "all", "1T 라이너"),
         (("A10", "A11", "A15", "A16", "T04"), "all", "1T 판"),
     ],
-    spare={"A04_liner_ch_L": 1},
+    spare={},
     extra=[],          # run_aluminum 에서 CAD 값으로 채움 (T03 띠, 모서리 판)
     notes=[
         "재료: 알루미늄 1T 전부 (재질은 업체 기본). 재료 포함 견적",
@@ -83,7 +83,7 @@ ALUMINUM = dict(
         "L_ANGLES",     # run_aluminum에서 params VENDOR.l_angles로 채움
         "H09 PTC 창판은 개구만 (장착 구멍은 저희가 PTC에 대고 뚫음)",
     ],
-    footer="여분: A04_L 라이너 1장. T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음)",
+    footer="T03 띠·모서리 판은 트레이 조립용 (리벳 구멍은 저희가 겹쳐 뚫음)",
 )
 
 
@@ -408,7 +408,7 @@ def heater_items(H):
     items.append(plate("H09_ptc_window_plate_Al1T", "PTC 창판", [],      # v3.3.1: 장착 구멍은 직접
                        [("poly", [(x0, z0), (x1, z0), (x1, z1), (x0, z1)])],
                        f"plate {pw:g} x {ph:g}, flange {f} x2",
-                       f"개구 {x1 - x0:g}×{z1 - z0:g} [PTC 핀 면 가정]. 장착 구멍 없음 (PTC 대고 직접). 날개 {f} 2개 같은 쪽으로"))
+                       f"개구 {x1 - x0:g}×{z1 - z0:g} (PTC 핀 면, 판매처 사진 기준). 장착 구멍 없음 (PTC 대고 직접). 날개 {f} 2개 같은 쪽으로"))
     items.append(plate("H11_heater_duct_end_Al1T", "히터 덕트 끝판 (팬 쪽)", [(x, z, 3.4) for x, z in H.FAN_HOLES],
                        [("circle", H.FAN_C, H.DUCT_HOLE_R)], f"plate {pw:g} x {ph:g}, flange {f} x2",
                        f"팬 Ø{2 * H.DUCT_HOLE_R:g} + Ø3.4 ×4. 날개 {f} 2개 같은 쪽으로"))
@@ -435,7 +435,7 @@ def run_aluminum(cad_module, outdir, version=""):
     vc = {k: int(v) for k, v in H.PARAMS["VENDOR_COLORS"].items() if k != "bom"}
     pk = dict(ALUMINUM)
     with_l = bool(H.PARAMS["VENDOR"]["l_angles"])
-    l_notes = (["앵글 대신 1T L자 10×10 절곡 13개: 비싸면 이 묶음만 빼 주세요 (앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
+    l_notes = (["앵글 대신 1T L자 10×10 절곡 {L_COUNT}: 비싸면 이 묶음만 빼 주세요 (앵글을 사서 자름). 12.5·20 짧은 조각은 어려우면 제외",
                 "L자 2개씩인 부품(A14·A19)은 좌우 대칭이라 1개는 반대 방향으로 접어 주세요"] if with_l else
                ["L자(앵글 대용)는 저희가 직접 가공 — 이 묶음에 없음"])
     pk["notes"] = []
@@ -481,6 +481,8 @@ def run_aluminum(cad_module, outdir, version=""):
          "벽 다리 구멍 = 아래 끝에서. 2개는 서로 반대 방향으로 접기 (좌우)"),
         ("A18_partition_angle", "칸막이 받침", "A18_partition_angle_1", 2, [(10.0, "floor")], "바닥 다리 가운데. 짧아서 어려우면 제외"),
     ]
+    l_count = f"{len(ang)}종 {sum(a[3] for a in ang)}개"
+    pk["notes"] = [n.replace("{L_COUNT}", l_count) for n in pk["notes"]]
     for nm, title, src, q, holes, note in (ang if with_l else []):   # VENDOR.l_angles false면 L자는 직접 가공 (묶음에서 뺌)
         L = part_len(H, src) if isinstance(src, str) else src
         hs = [(x, 15.0 if leg == "wall" else 5.0, 3.4) for x, leg in holes]
