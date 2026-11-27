@@ -7,6 +7,7 @@ v3.0 (메이저): 회로를 본체 오른쪽 측면 박스(K)로 분리, 공기 
 v3.1: TCS34725·LED·천장 센서 인서트·부저 삭제, 전장부 관통구를 PG9 전력/신호 2개로 분리,
 흡기: 활성탄을 뒷판 바깥 커버(차가운 쪽)로, BME688 #2를 관 옆벽 홈(흐름과 나란히), 출구-칸막이 20mm.
 v3.2: 트레이 메시를 바닥 다리·십자 띠 위로, 라이너 구멍 업체 가공(M3 Ø4.0, 케이블 Ø12 → v3.5 Ø16 + 실리콘 그로밋).
+v3.7: 히터 덕트 끼움 여유 0.5 (H09·H11 106.5, H10 안쪽 109.5), L03 볼트 렌치볼트.
 
 v2.8 → v2.9 주요 변경
 - 순환 구조: 덕트 벽을 전장부 바닥까지 내려 '플레넘(앞)'과 '복귀실(뒤)'로 분리.
@@ -158,15 +159,16 @@ def bolt(name, axis, c, head_at, direction, L, d=3, head="pan", spec=None):
     hd, hh = (5.5, 2.4) if head == "pan" else (6.0, 1.7)
     if d == 4:
         hd, hh = (7.0, 2.8) if head == "pan" else (8.0, 2.3)
+        if head == "socket": hd, hh = 7.0, 4.0     # DIN 912 M4 (v3.7.0)
     if d == 5:
         hd, hh = (9.5, 3.5) if head == "pan" else (9.5, 2.7)
     r = d / 2 - 0.05
     if direction > 0:
         sh = cyl(axis, c, r, head_at, head_at + L)
-        hdz = cyl(axis, c, hd / 2, head_at - hh, head_at) if head == "pan" else None
+        hdz = cyl(axis, c, hd / 2, head_at - hh, head_at) if head in ("pan", "socket") else None
     else:
         sh = cyl(axis, c, r, head_at - L, head_at)
-        hdz = cyl(axis, c, hd / 2, head_at, head_at + hh) if head == "pan" else None
+        hdz = cyl(axis, c, hd / 2, head_at, head_at + hh) if head in ("pan", "socket") else None
     s = sh.union(hdz) if hdz is not None else sh
     add(name, s, C_BOLT, kind="fastener")
     count(spec or f"M{d}×{L} {'냄비머리' if head == 'pan' else '접시머리'} 볼트")
@@ -495,8 +497,8 @@ add("L03_loadcell_tray_block", tray_blk, C_PETG, "PETG", "3D프린트")
 for i, p in enumerate(lc_base_holes):
     bolt(f"L_bolt_base_{i}", "z", p, FLOOR_Z, +1, 25, d=LC["thread_base"], spec=f"M{LC['thread_base']:g}×25 냄비머리 볼트 (로드셀 고정 쪽)")
 for i, p in enumerate(lc_tray_holes):
-    bolt(f"L_bolt_tray_{i}", "z", p, tz0 + blk_h2 - 4, -1, 30, d=LC["thread_tray"], head="flat",
-         spec=f"M{LC['thread_tray']:g}×30 볼트 (로드셀 트레이 쪽, 머리 묻힘)")
+    bolt(f"L_bolt_tray_{i}", "z", p, tz0 + blk_h2 - 4, -1, 30, d=LC["thread_tray"], head="socket",
+         spec=f"M{LC['thread_tray']:g}×30 렌치볼트 DIN 912 (로드셀 트레이 쪽, 머리 Ø7×4가 L03 자리 Ø7.5×4에 묻힘)")
 sz0 = tz0 + blk_h2
 add("A11_loadcell_shield_Al1T_100x40", box(CH_CX - 50, CH_CY - 20, sz0, CH_CX + 50, CH_CY + 20, sz0 + 1), C_AL, "알루미늄 1T", "재단",
     note="L04와 함께 트레이 블록 윗면에 중성 실리콘으로 접착 (PVC 본드·순간접착제 금지)")
@@ -746,6 +748,9 @@ DUCT_HOLE_R = FAN60["duct_hole_d"] / 2            # v3.4.0 Ø56 (끝판 H11)
 assert IX0 <= FAN_C[0] - 30 and IX1 >= FAN_C[0] + 30 and IZ0 <= FAN_C[1] - DUCT_HOLE_R and IZ1 >= FAN_C[1] + DUCT_HOLE_R, "팬 구멍이 덕트 밖"
 assert PTC_Z0 > IZ0 + 3 and PTC_Z0 + PTC["h"] < IZ1 - 3, "PTC 높이가 덕트 안에 안 들어감"
 FLG = 10                                        # 창판·끝판·뚜껑 날개 (바깥 치수)
+HT_FIT = 0.5                                    # v3.7.0 끼움 여유 합계 (한쪽 0.25). 절곡 안쪽 R·업체 공차 ±0.3 대비
+PX0, PX1 = IX0 + HT_FIT / 2, IX1 - HT_FIT / 2   # H09·H11 판 바깥 (H06 안쪽에 끼움, 106.5)
+LX0, LX1 = BX_X0 - HT_FIT / 2, BX_X1 + HT_FIT / 2   # H10 뚜껑 안쪽 (H06 바깥을 덮음, 109.5)
 
 # H06 몸통: 바닥 + 양옆 (ㄷ자 2번 접기)
 duct = box(BX_X0, BX_Y0, BX_Z0, BX_X1, BX_Y1, IZ0) \
@@ -761,22 +766,22 @@ add("H06_heater_duct_Al1T", duct, C_AL, "알루미늄 1T", "재단+절곡",
     note=f"ㄷ자 (바닥 {BX_X1 - BX_X0:.1f} + 양옆 {IZ1 - BX_Z0:.1f}), 길이 {BX_Y1 - BX_Y0:g}. 오른벽 = 95°C 서모스탯 캡 Ø{KSD['cap_d'] + 1:g} + Ø3.4 ×2. "
          "바닥 Ø3.4 ×2 → 와셔 3장 + 스탠드오프. 이음매 알루미늄 테이프")
 # H10 뚜껑: 위판 + 양옆 날개 (몸통 바깥에 겹쳐 리벳)
-lid = box(BX_X0 - HT, BX_Y0, IZ1, BX_X1 + HT, BX_Y1, BX_Z1) \
-    .union(box(BX_X0 - HT, BX_Y0, BX_Z1 - FLG, BX_X0, BX_Y1, BX_Z1)).union(box(BX_X1, BX_Y0, BX_Z1 - FLG, BX_X1 + HT, BX_Y1, BX_Z1))
+lid = box(LX0 - HT, BX_Y0, IZ1, LX1 + HT, BX_Y1, BX_Z1) \
+    .union(box(LX0 - HT, BX_Y0, BX_Z1 - FLG, LX0, BX_Y1, BX_Z1)).union(box(LX1, BX_Y0, BX_Z1 - FLG, LX1 + HT, BX_Y1, BX_Z1))
 add("H10_heater_duct_lid_Al1T", lid, C_AL, "알루미늄 1T", "재단+절곡",
-    note=f"위판 + 양옆 날개 {FLG} (2번 접기), 날개를 몸통 바깥에 리벳 3개씩. PTC 리드선을 출구 쪽으로 뺀 뒤 덮기")
+    note=f"위판 + 양옆 날개 {FLG} (2번 접기), 안쪽 폭 {LX1 - LX0:g} (몸통 바깥 + 끼움 여유 {HT_FIT:g}), 날개를 몸통 바깥에 리벳 3개씩. PTC 리드선을 출구 쪽으로 뺀 뒤 덮기")
 # H11 끝판: 팬 쪽 (1T), 날개 2개는 출구 쪽으로
-endp = box(IX0, fl_y, IZ0, IX1, fan_y0h, IZ1).cut(cyl("y", FAN_C, DUCT_HOLE_R, fl_y - 1, fan_y0h + 1))
+endp = box(PX0, fl_y, IZ0, PX1, fan_y0h, IZ1).cut(cyl("y", FAN_C, DUCT_HOLE_R, fl_y - 1, fan_y0h + 1))
 for p in FAN_HOLES:
     endp = endp.cut(cyl("y", p, 1.7, fl_y - 1, fan_y0h + 1))
-endp = endp.union(box(IX0, fan_y0h - FLG, IZ0, IX0 + 1, fl_y, IZ1)).union(box(IX1 - 1, fan_y0h - FLG, IZ0, IX1, fl_y, IZ1))
+endp = endp.union(box(PX0, fan_y0h - FLG, IZ0, PX0 + 1, fl_y, IZ1)).union(box(PX1 - 1, fan_y0h - FLG, IZ0, PX1, fl_y, IZ1))
 add("H11_heater_duct_end_Al1T", endp, C_AL, "알루미늄 1T", "재단+절곡",
-    note=f"팬 앞 (Ø{FAN60['duct_hole_d']:g} + Ø3.4 ×4, 팬 볼트로 같이 조임). 날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩")
+    note=f"팬 앞 (Ø{FAN60['duct_hole_d']:g} + Ø3.4 ×4, 팬 볼트로 같이 조임). 판 폭 {PX1 - PX0:g} (몸통 안쪽 − 끼움 여유 {HT_FIT:g}). 날개 {FLG} 2개 → 몸통 옆벽에 리벳 2개씩")
 # H09 PTC 창판: 핀 면만 열림, PTC를 볼트 4개로 매닮 (1T), 날개는 팬 쪽으로
 WIN = (PTC_CX - PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] - PTC["fin_h"]) / 2, PTC_CX + PTC["fin_l"] / 2, PTC_Z0 + (PTC["h"] + PTC["fin_h"]) / 2)
 PTC_HOLES = [(PTC_CX + sx * PTC["mount_px"] / 2, FAN_C[1] + sz * PTC["mount_pz"] / 2) for sx in (-1, 1) for sz in (-1, 1)]
-win = box(IX0, PTC_Y1, IZ0, IX1, PTC_Y1 + 1, IZ1).cut(box(WIN[0], PTC_Y1 - 1, WIN[1], WIN[2], PTC_Y1 + 2, WIN[3]))
-win_fl = box(IX0, PTC_Y1 + 1, IZ0, IX0 + 1, PTC_Y1 + FLG, IZ1).union(box(IX1 - 1, PTC_Y1 + 1, IZ0, IX1, PTC_Y1 + FLG, IZ1))
+win = box(PX0, PTC_Y1, IZ0, PX1, PTC_Y1 + 1, IZ1).cut(box(WIN[0], PTC_Y1 - 1, WIN[1], WIN[2], PTC_Y1 + 2, WIN[3]))
+win_fl = box(PX0, PTC_Y1 + 1, IZ0, PX0 + 1, PTC_Y1 + FLG, IZ1).union(box(PX1 - 1, PTC_Y1 + 1, IZ0, PX1, PTC_Y1 + FLG, IZ1))
 H09_VENDOR = win.union(win_fl)                  # v3.3.1: 업체용 = 장착 구멍 없음 (PTC 받은 뒤 대고 직접 뚫기)
 for p in PTC_HOLES:
     win = win.cut(cyl("y", p, 1.7, PTC_Y1 - 1, PTC_Y1 + 2))
