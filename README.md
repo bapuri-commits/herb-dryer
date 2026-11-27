@@ -64,7 +64,7 @@ python build.py          # 또는 make all
 | `herb_dryer.step` | 전체 조립 STEP |
 | `interference.txt` | 간섭 검사. **1건이라도 있으면 빌드 실패** (1차↔2차 제외) |
 | `drawings/` | `herb_dryer_holes.pdf` 구멍표, `herb_dryer_print_1to1.pdf` 1:1 인쇄, `dxf/` |
-| `stl/` | 3D 프린트 부품 23개 (X01 시험편 포함), 파일 이름에 버전 |
+| `stl/` | 3D 프린트 부품 28개, 파일 이름에 버전 |
 | `render/` | 외관·내부·단면 PNG (리눅스 서버는 `xvfb-run python build.py`) |
 | `fasteners.csv`, `print_parts.csv` | 체결부품 수량, 3D 프린트 목록 |
 | `bom_csv/` | BOM 시트별 CSV |
